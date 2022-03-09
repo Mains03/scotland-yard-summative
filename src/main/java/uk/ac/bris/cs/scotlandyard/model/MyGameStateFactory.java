@@ -7,6 +7,7 @@ import javax.annotation.Nonnull;
 import com.google.common.collect.ImmutableSet;
 import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
+import uk.ac.bris.cs.scotlandyard.model.Piece.MrX;
 
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +34,12 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				final ImmutableList<LogEntry> log,
 				final Player mrX,
 				final ImmutableList<Player> detectives) {
+			if (setup == null) throw new IllegalArgumentException("Setup is null!");
+			if (remaining == null) throw new IllegalArgumentException("Remaining is null!");
+			if (log == null) throw new IllegalArgumentException("Log is null!");
+			if (mrX == null) throw new IllegalArgumentException("MrX is null!");
+			if (detectives == null) throw new IllegalArgumentException("Detectives is null!");
+			if (setup.moves.isEmpty()) throw new IllegalArgumentException("Moves is empty!");
 			this.setup = setup;
 			this.remaining = remaining;
 			this.log = log;
@@ -93,9 +100,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			GameSetup setup,
 			Player mrX,
 			ImmutableList<Player> detectives) {
-		// TODO
-		throw new RuntimeException("Implement me!");
-
+		return new MyGameState(setup, ImmutableSet.of(MrX.MRX), ImmutableList.of(), mrX, detectives);
 	}
 
 }
