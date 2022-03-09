@@ -12,7 +12,6 @@ import uk.ac.bris.cs.scotlandyard.model.Piece.MrX;
 import java.util.List;
 import java.util.Optional;
 
-import  uk.ac.bris.cs.scotlandyard.model.Piece.MrX;
 
 /**
  * cw-model
@@ -47,13 +46,6 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			this.log = log;
 			this.mrX = mrX;
 			this.detectives = detectives;
-
-			if (setup == null) throw new IllegalArgumentException("setup is null");
-			if (remaining == null) throw new IllegalArgumentException("remaining is null");
-			if (log == null) throw new IllegalArgumentException("log is null");
-			if (mrX == null) throw new IllegalArgumentException("mrX is null");
-			if (detectives == null) throw new IllegalArgumentException("detectives is null");
-
 		}
 
 		@Nonnull
