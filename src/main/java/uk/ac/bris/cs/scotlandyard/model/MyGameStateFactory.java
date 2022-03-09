@@ -1,5 +1,7 @@
 package uk.ac.bris.cs.scotlandyard.model;
 
+// not sure if we are supposed to import this
+// import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 
 import javax.annotation.Nonnull;
@@ -10,7 +12,10 @@ import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 import uk.ac.bris.cs.scotlandyard.model.Piece.MrX;
 
 import java.util.List;
+import java.util.Objects;
 import java.util.Optional;
+import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 
 
 /**
@@ -35,17 +40,33 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				final ImmutableList<LogEntry> log,
 				final Player mrX,
 				final ImmutableList<Player> detectives) {
-			if (setup == null) throw new IllegalArgumentException("Setup is null!");
-			if (remaining == null) throw new IllegalArgumentException("Remaining is null!");
-			if (log == null) throw new IllegalArgumentException("Log is null!");
-			if (mrX == null) throw new IllegalArgumentException("MrX is null!");
-			if (detectives == null) throw new IllegalArgumentException("Detectives is null!");
-			if (setup.moves.isEmpty()) throw new IllegalArgumentException("Moves is empty!");
+			// tests imply NullPointerException should be thrown
+			// found this concise way of doing this
+			Objects.requireNonNull(setup);
+			Objects.requireNonNull(remaining);
+			Objects.requireNonNull(log);
+			Objects.requireNonNull(mrX);
+			Objects.requireNonNull(detectives);
+			if (setup.moves.isEmpty()) { throw new IllegalArgumentException(); }
+			inspectDetectives(detectives);
+			if (setup.graph.nodes().size() == 0) { throw new IllegalArgumentException(); }
 			this.setup = setup;
 			this.remaining = remaining;
 			this.log = log;
 			this.mrX = mrX;
 			this.detectives = detectives;
+			winner = ImmutableSet.of();
+		}
+
+		private void inspectDetectives(final ImmutableList<Player> detectives) {
+			if (detectives.stream() // check for double tickets
+					.anyMatch(player -> player.has(ScotlandYard.Ticket.DOUBLE))) { throw new IllegalArgumentException(); }
+			if (detectives.stream() // check for duplicate locations
+					.map(player -> player.location())
+					.distinct()
+					.count() < detectives.size()) { throw new IllegalArgumentException(); }
+			if (detectives.stream() // check for secret tickets
+					.anyMatch(player -> player.has(ScotlandYard.Ticket.SECRET))) { throw new IllegalArgumentException(); }
 		}
 
 		@Nonnull
@@ -57,19 +78,45 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Nonnull
 		@Override
 		public ImmutableSet<Piece> getPlayers() {
-			return null;
+			ImmutableSet.Builder<Piece> builder = ImmutableSet.builder();
+			builder.add(mrX.piece());
+			builder.addAll(detectives.stream().map(player -> player.piece()).collect(Collectors.toList()));
+			return builder.build();
 		}
 
 		@Nonnull
 		@Override
 		public Optional<Integer> getDetectiveLocation(Piece.Detective detective) {
-			return Optional.empty();
+			Optional<Player> target = detectives.stream()
+					.filter(player -> player.piece() == detective)
+					.findFirst();
+			return target.isPresent() ?
+					Optional.of(target.get().location())
+					: Optional.empty();
 		}
 
 		@Nonnull
 		@Override
 		public Optional<TicketBoard> getPlayerTickets(Piece piece) {
-			return Optional.empty();
+			AtomicReference<Player> target = new AtomicReference<Player>();
+
+			if (mrX.piece() == piece) { target.set(mrX); }
+			else {
+				detectives.stream()
+						.filter(player -> player.piece() == piece)
+						.findFirst()
+						.ifPresent(player -> target.set(player));
+			}
+
+			if (target.get() == null) { return Optional.empty(); }
+			return Optional.of(ticket -> {
+				// not sure if this anonymous instance will always have access to target
+				if (target.get().tickets().containsKey(ticket)) {
+					return target.get().tickets().get(ticket);
+				} else {
+					return 0;
+				}
+			});
 		}
 
 		@Nonnull
@@ -81,7 +128,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Nonnull
 		@Override
 		public ImmutableSet<Piece> getWinner() {
-			return null;
+			return winner;
 		}
 
 		@Nonnull
