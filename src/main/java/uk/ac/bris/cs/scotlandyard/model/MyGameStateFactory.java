@@ -6,6 +6,7 @@ import com.google.common.collect.ImmutableList;
 
 import javax.annotation.Nonnull;
 
+import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.ImmutableValueGraph;
 import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
@@ -135,14 +136,85 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Nonnull
 		@Override
 		public ImmutableSet<Move> getAvailableMoves() {
-			Function<Player, ImmutableSet<Move>> getPlayerMoves = player -> {
-				return null;
-			};
+			ImmutableSet.Builder<Move> availableMoves = new ImmutableSet.Builder<>();
+			availableMoves.addAll(getAvailableMoves(mrX));
+			for (Player detective : detectives)
+				availableMoves.addAll(getAvailableMoves(detective));
+			return availableMoves.build();
+		}
 
-			ImmutableSet.Builder<Move> builder = new ImmutableSet.Builder<Move>();
-			detectives.stream()
-					.forEach(player -> builder.addAll(getPlayerMoves.apply(player)));
-			builder.addAll(getPlayerMoves.apply(mrX));
+		private ImmutableSet<Move> getAvailableMoves(Player player) {
+			ImmutableSet.Builder<Move> availableMoves = new ImmutableSet.Builder<>();
+			availableMoves.addAll(getAvailableSingleMoves(player));
+			if (player.isMrX()) {
+				availableMoves.addAll(getAvailableDoubleMoves(player));
+			}
+			return availableMoves.build();
+		}
+
+		private ImmutableSet<Move.SingleMove> getAvailableSingleMoves(Player player) {
+			ImmutableSet.Builder<Move.SingleMove> builder = new ImmutableSet.Builder<>();
+			for (Integer destination : setup.graph.adjacentNodes(player.location())) {
+				Optional<ImmutableSet<ScotlandYard.Transport>> allTransport = setup.graph.edgeValue(player.location(), destination);
+				if (allTransport.isEmpty()) continue;
+				for (ScotlandYard.Transport transport : allTransport.get()) {
+					// account for MrX's secret tickets
+					if (player.isMrX()) {
+						if (player.has(ScotlandYard.Ticket.SECRET)) {
+							builder.add(new Move.SingleMove(player.piece(), player.location(), ScotlandYard.Ticket.SECRET, destination));
+						}
+					}
+					if (!player.has(transport.requiredTicket())) continue;
+					builder.add(new Move.SingleMove(player.piece(), player.location(), transport.requiredTicket(), destination));
+				}
+			}
+			return builder.build();
+		}
+
+		private ImmutableSet<Move.DoubleMove> getAvailableDoubleMoves(Player player) {
+			if (!player.isMrX()) { throw new IllegalArgumentException(); }
+			ImmutableSet.Builder<Move.DoubleMove> builder = new ImmutableSet.Builder<>();
+			ImmutableSet<Move.SingleMove> singleMoves = getAvailableSingleMoves(player);
+			for (Move.SingleMove firstMove : singleMoves) {
+				for (Move.SingleMove secondMove : getAvailableSecondMoves(player, firstMove)) {
+					builder.add(new Move.DoubleMove(
+							player.piece(),
+							player.location(),
+							firstMove.ticket,
+							firstMove.destination,
+							secondMove.ticket,
+							secondMove.destination));
+				}
+			}
+			return builder.build();
+		}
+
+		// only returns the available second moves
+		private ImmutableSet<Move.SingleMove> getAvailableSecondMoves(Player player, Move.SingleMove firstMove) {
+			if (!player.isMrX()) { throw new IllegalArgumentException(); }
+			ImmutableSet.Builder<Move.SingleMove> builder = new ImmutableSet.Builder<>();
+			for (Integer secondDestination : setup.graph.adjacentNodes(firstMove.destination)) {
+				Optional<ImmutableSet<ScotlandYard.Transport>> allTransport = setup.graph.edgeValue(firstMove.destination, secondDestination);
+				if (allTransport.isEmpty()) continue;
+				for (ScotlandYard.Transport transport : allTransport.get()) {
+					// account for MrX's secret tickets
+					boolean mrXCanUseSecretTicket = false;
+					if (player.hasAtLeast(ScotlandYard.Ticket.SECRET, 2)) {
+						mrXCanUseSecretTicket = true;
+					} else if (player.has(ScotlandYard.Ticket.SECRET)) {
+						if (firstMove.ticket != ScotlandYard.Ticket.SECRET) {
+							mrXCanUseSecretTicket = true;
+						}
+					}
+					if (mrXCanUseSecretTicket) {
+						builder.add(new Move.SingleMove(player.piece(), firstMove.destination, ScotlandYard.Ticket.SECRET, secondDestination));
+					}
+					if (!player.has(transport.requiredTicket())) continue;
+					if ((firstMove.ticket == transport.requiredTicket())
+							&& (!player.hasAtLeast(transport.requiredTicket(), 2))) continue;
+					builder.add(new Move.SingleMove(player.piece(), firstMove.destination, transport.requiredTicket(), secondDestination));
+				}
+			}
 			return builder.build();
 		}
 
