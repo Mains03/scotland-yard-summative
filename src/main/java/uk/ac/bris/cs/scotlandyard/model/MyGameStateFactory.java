@@ -7,14 +7,15 @@ import com.google.common.collect.ImmutableList;
 import javax.annotation.Nonnull;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.graph.ImmutableValueGraph;
 import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 import uk.ac.bris.cs.scotlandyard.model.Piece.MrX;
 
-import java.util.List;
-import java.util.Objects;
-import java.util.Optional;
+import java.util.*;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.function.BiFunction;
+import java.util.function.Function;
 import java.util.stream.Collectors;
 
 
@@ -134,7 +135,42 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Nonnull
 		@Override
 		public ImmutableSet<Move> getAvailableMoves() {
-			return null;
+			var builder = ImmutableSet.builder();
+
+			BiFunction<Player, ScotlandYard.Ticket, Boolean> hasTicket = (player, ticket) -> {
+				player.tickets().containsKey(ticket);
+			};
+
+			Function<Player, List<ScotlandYard.Ticket>> getTickets = player -> {
+				return player.tickets().keySet().stream()
+						.filter(ticket -> hasTicket.apply(player, ticket))
+						.collect(Collectors.toList());
+			};
+
+			Function<Integer, Set<ScotlandYard.Ticket>> useableTicketsAtLocation = location -> {
+				Set<ScotlandYard.Ticket> tickets = new HashSet<ScotlandYard.Ticket>();
+				setup.graph.adjacentNodes(location).stream()
+						.map(dest -> setup.graph.edgeValue(location, dest).get())
+						.forEach(transports -> {
+							transports.stream()
+									.forEach(transport -> tickets.add(transport.requiredTicket()));
+						});
+				return tickets;
+			};
+
+			Function<Player, List<ScotlandYard.Ticket>> getUseableTickets = player -> {
+				Set<ScotlandYard.Ticket> targetTickets = useableTicketsAtLocation.apply(player.location());
+				return getTickets.apply(player).stream()
+						.filter(ticket -> targetTickets.contains(ticket))
+						.collect(Collectors.toList());
+			};
+
+			// need to know the destination of each ticket also
+			Function<Player, Move> getMoves = player -> {
+				getUseableTickets.apply(player);
+			};
+
+			return builder.build();
 		}
 
 		@Nonnull
