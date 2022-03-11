@@ -57,6 +57,12 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			this.log = log;
 			this.mrX = mrX;
 			this.detectives = detectives;
+
+
+			this.moves = makeMoves();
+
+
+
 			winner = ImmutableSet.of();
 		}
 
@@ -133,15 +139,25 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			return winner;
 		}
 
-		@Nonnull
-		@Override
-		public ImmutableSet<Move> getAvailableMoves() {
+
+
+
+		private ImmutableSet<Move> makeMoves() {
 			ImmutableSet.Builder<Move> availableMoves = new ImmutableSet.Builder<>();
 			availableMoves.addAll(getAvailableMoves(mrX));
 			for (Player detective : detectives)
 				availableMoves.addAll(getAvailableMoves(detective));
 			return availableMoves.build();
 		}
+
+
+		@Nonnull
+		@Override
+		public ImmutableSet<Move> getAvailableMoves() {
+			return moves;
+		}
+
+
 
 		private ImmutableSet<Move> getAvailableMoves(Player player) {
 			ImmutableSet.Builder<Move> availableMoves = new ImmutableSet.Builder<>();
@@ -221,6 +237,10 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		@Nonnull
 		@Override
 		public GameState advance(Move move) {
+			if(!moves.contains(move)) throw new IllegalArgumentException("Illegal move: "+move);
+
+			//if
+
 			return null;
 		}
 	}
