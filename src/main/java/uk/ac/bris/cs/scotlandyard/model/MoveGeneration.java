@@ -3,10 +3,8 @@ package uk.ac.bris.cs.scotlandyard.model;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.ImmutableValueGraph;
 
-import javax.annotation.concurrent.Immutable;
 import java.util.Objects;
 import java.util.Optional;
-import java.util.concurrent.TransferQueue;
 
 public interface MoveGeneration {
     public ImmutableSet<Move> generateMoves();
@@ -153,11 +151,114 @@ public interface MoveGeneration {
             Objects.requireNonNull(graph);
             Objects.requireNonNull(player);
             if (!player.isMrX()) { throw new IllegalArgumentException(); }
-            moves = generateMoves(player, new SingleMoveGeneration(graph, player).getSingleMoves());
+            moves = generateMoves(graph, player, new SingleMoveGeneration(graph, player).getSingleMoves());
         }
 
-        private ImmutableSet<Move.DoubleMove> generateMoves(final Player player, ImmutableSet<Move.SingleMove> singleMoves) {
-            return null;
+        private ImmutableSet<Move.DoubleMove> generateMoves(
+                final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+                final Player player,
+                final ImmutableSet<Move.SingleMove> singleMoves
+        ) {
+            ImmutableSet.Builder<Move.DoubleMove> builder = new ImmutableSet.Builder<>();
+            singleMoves.stream().forEach(move -> {
+                builder.addAll(generateDoubleMoves(graph, player, move));
+            });
+            return builder.build();
+        }
+
+        private ImmutableSet<Move.DoubleMove> generateDoubleMoves(
+                final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+                final Player player,
+                final Move.SingleMove singleMove
+        ) {
+            ImmutableSet.Builder<Move.DoubleMove> builder = new ImmutableSet.Builder<>();
+            graph.adjacentNodes(singleMove.destination).stream().forEach(secondDestination -> {
+                builder.addAll(generateDoubleMovesToSecondDestination(graph, player, singleMove, secondDestination));
+            });
+            return builder.build();
+        }
+
+        private ImmutableSet<Move.DoubleMove> generateDoubleMovesToSecondDestination(
+                final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+                final Player player,
+                final Move.SingleMove singleMove,
+                Integer secondDestination
+        ) {
+            ImmutableSet.Builder<Move.DoubleMove> builder = new ImmutableSet.Builder<>();
+            graph.edgeValue(singleMove.destination, secondDestination).ifPresent(allTransport -> {
+                allTransport.stream().forEach(transport -> {
+                    generateDoubleMoveFromTransport(player, singleMove, secondDestination, transport).ifPresent(move -> {
+                        builder.add(move);
+                    });
+                });
+            });
+            generateDoubleMoveUsingSecret(player, singleMove, secondDestination).ifPresent(move -> {
+                builder.add(move);
+            });
+            return builder.build();
+        }
+
+        private Move.DoubleMove createDoubleMove(
+                final Player player,
+                final Move.SingleMove singleMove,
+                Integer secondDestination,
+                ScotlandYard.Ticket ticket
+        ) {
+            return new Move.DoubleMove(
+                    player.piece(),
+                    player.location(),
+                    singleMove.ticket,
+                    singleMove.destination,
+                    ticket,
+                    secondDestination
+            );
+        }
+
+        private Optional<Move.DoubleMove> generateDoubleMoveFromTransport(
+                final Player player,
+                final Move.SingleMove singleMove,
+                Integer secondDestination,
+                final ScotlandYard.Transport transport
+        ) {
+            boolean playerCanUseTransport = false;
+            if (singleMove.ticket == transport.requiredTicket()) {
+                playerCanUseTransport = player.hasAtLeast(transport.requiredTicket(), 2);
+            } else {
+                playerCanUseTransport = player.has(transport.requiredTicket());
+            }
+            if (playerCanUseTransport) {
+                return Optional.of(createDoubleMove(
+                        player,
+                        singleMove,
+                        secondDestination,
+                        transport.requiredTicket()
+                ));
+            } else {
+                return Optional.empty();
+            }
+        }
+
+        private Optional<Move.DoubleMove> generateDoubleMoveUsingSecret(
+                final Player player,
+                final Move.SingleMove singleMove,
+                Integer secondDestination
+        ) {
+            boolean playerCanUseTransport = false;
+            if (singleMove.ticket == ScotlandYard.Ticket.SECRET) {
+                playerCanUseTransport = player.hasAtLeast(ScotlandYard.Ticket.SECRET, 2);
+            } else {
+                playerCanUseTransport = player.has(ScotlandYard.Ticket.SECRET);
+            }
+            if (playerCanUseTransport) {
+                return Optional.of(createDoubleMove(
+                        player,
+                        singleMove,
+                        secondDestination,
+                        ScotlandYard.Ticket.SECRET
+                ));
+            } else {
+                return Optional.empty();
+            }
         }
 
         @Override
