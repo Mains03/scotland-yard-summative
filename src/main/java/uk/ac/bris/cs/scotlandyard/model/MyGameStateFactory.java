@@ -35,23 +35,19 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private List<Player> detectives;
 		private ImmutableSet<Move> moves;
 		private ImmutableSet<Piece> winner;
-		private ImmutableList<Player> moveable;
 
 		private MyGameState(
 				final GameSetup setup,
 				final ImmutableSet<Piece> remaining,
 				final ImmutableList<LogEntry> log,
 				final Player mrX,
-				final ImmutableList<Player> detectives,
-				final ImmutableList<Player> moveable) {
-			// tests imply NullPointerException should be thrown
-			// found this concise way of doing this
+				final ImmutableList<Player> detectives
+		) {
 			Objects.requireNonNull(setup);
 			Objects.requireNonNull(remaining);
 			Objects.requireNonNull(log);
 			Objects.requireNonNull(mrX);
 			Objects.requireNonNull(detectives);
-			Objects.requireNonNull(moveable);
 			if (setup.moves.isEmpty()) { throw new IllegalArgumentException(); }
 			inspectDetectives(detectives);
 			if (setup.graph.nodes().size() == 0) { throw new IllegalArgumentException(); }
@@ -60,9 +56,15 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			this.log = log;
 			this.mrX = mrX;
 			this.detectives = detectives;
-			moves = generateMoves(setup.graph, moveable);
+			moves = generateMoves(setup.graph, createMovableList(mrX, detectives));
 			winner = ImmutableSet.of();
-			this.moveable = moveable;
+		}
+
+		private List<Player> createMovableList(Player mrX, ImmutableList<Player> detectives) {
+			List<Player> movable = new ArrayList<>();
+			movable.add(mrX);
+			movable.addAll(detectives);
+			return movable;
 		}
 
 		private void inspectDetectives(final ImmutableList<Player> detectives) {
@@ -78,28 +80,14 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 		private ImmutableSet<Move> generateMoves(
 				final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-				final ImmutableList<Player> players
+				final List<Player> players
 		) {
-
 			ImmutableSet.Builder<Move> builder = new ImmutableSet.Builder<>();
-
 			players.stream().forEach(player -> {
 				builder.addAll(new MoveGeneration.SingleMoveGeneration(graph, player).generateMoves());
 				if (player.isMrX()) builder.addAll(new MoveGeneration.DoubleMoveGeneration(graph, player).generateMoves());
 			});
-
-			/*
-			MoveGeneration moveGeneration = new MoveGeneration.SingleMoveGeneration(graph, mrX);
-			builder.addAll(moveGeneration.generateMoves());
-
-			moveGeneration = new MoveGeneration.DoubleMoveGeneration(graph, mrX);
-			builder.addAll(moveGeneration.generateMoves());
-			 */
-
 			return builder.build();
-
-
-
 		}
 
 		@Nonnull
@@ -196,7 +184,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			GameSetup setup,
 			Player mrX,
 			ImmutableList<Player> detectives) {
-		return new MyGameState(setup, ImmutableSet.of(MrX.MRX), ImmutableList.of(), mrX, detectives, ImmutableList.of(mrX));
+		return new MyGameState(setup, ImmutableSet.of(MrX.MRX), ImmutableList.of(), mrX, detectives);
 	}
 
 }
