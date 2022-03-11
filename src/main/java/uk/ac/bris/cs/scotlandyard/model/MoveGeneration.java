@@ -48,6 +48,9 @@ public abstract class MoveGeneration {
             return builder.build();
         }
 
+        /*
+        Assumes the ticket used is the one required by the transport.
+         */
         private ImmutableSet<Move.SingleMove> generateGeneralMovesToDestination(
                 final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
                 final Player player,
@@ -64,6 +67,9 @@ public abstract class MoveGeneration {
             return builder.build();
         }
 
+        /*
+        Assumes the ticket used is the one required by the transport.
+         */
         private Optional<Move.SingleMove> generateGeneralMoveFromTransport(
                 final Player player,
                 Integer destination,
