@@ -57,12 +57,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			this.log = log;
 			this.mrX = mrX;
 			this.detectives = detectives;
-
-
-			this.moves = makeMoves();
-
-
-
+			moves = generateMoves(setup.graph, detectives, mrX);
 			winner = ImmutableSet.of();
 		}
 
@@ -75,6 +70,22 @@ public final class MyGameStateFactory implements Factory<GameState> {
 					.count() < detectives.size()) { throw new IllegalArgumentException(); }
 			if (detectives.stream() // check for secret tickets
 					.anyMatch(player -> player.has(ScotlandYard.Ticket.SECRET))) { throw new IllegalArgumentException(); }
+		}
+
+		private ImmutableSet<Move> generateMoves(
+				final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+				final ImmutableList<Player> detectives,
+				final Player mrX
+		) {
+			ImmutableSet.Builder<Move> builder = new ImmutableSet.Builder<>();
+			detectives.stream().forEach(player -> {
+				builder.addAll(new MoveGeneration.SingleMoveGeneration(graph, player).generateMoves());
+			});
+			MoveGeneration moveGeneration = new MoveGeneration.SingleMoveGeneration(graph, mrX);
+			builder.addAll(moveGeneration.generateMoves());
+			moveGeneration = new MoveGeneration.DoubleMoveGeneration(graph, mrX);
+			builder.addAll(moveGeneration.generateMoves());
+			return builder.build();
 		}
 
 		@Nonnull
@@ -139,99 +150,10 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			return winner;
 		}
 
-
-
-
-		private ImmutableSet<Move> makeMoves() {
-			ImmutableSet.Builder<Move> availableMoves = new ImmutableSet.Builder<>();
-			availableMoves.addAll(getAvailableMoves(mrX));
-			for (Player detective : detectives)
-				availableMoves.addAll(getAvailableMoves(detective));
-			return availableMoves.build();
-		}
-
-
 		@Nonnull
 		@Override
 		public ImmutableSet<Move> getAvailableMoves() {
 			return moves;
-		}
-
-
-
-		private ImmutableSet<Move> getAvailableMoves(Player player) {
-			ImmutableSet.Builder<Move> availableMoves = new ImmutableSet.Builder<>();
-			availableMoves.addAll(getAvailableSingleMoves(player));
-			if (player.isMrX()) {
-				availableMoves.addAll(getAvailableDoubleMoves(player));
-			}
-			return availableMoves.build();
-		}
-
-		private ImmutableSet<Move.SingleMove> getAvailableSingleMoves(Player player) {
-			ImmutableSet.Builder<Move.SingleMove> builder = new ImmutableSet.Builder<>();
-			for (Integer destination : setup.graph.adjacentNodes(player.location())) {
-				Optional<ImmutableSet<ScotlandYard.Transport>> allTransport = setup.graph.edgeValue(player.location(), destination);
-				if (allTransport.isEmpty()) continue;
-				for (ScotlandYard.Transport transport : allTransport.get()) {
-					// account for MrX's secret tickets
-					if (player.isMrX()) {
-						if (player.has(ScotlandYard.Ticket.SECRET)) {
-							builder.add(new Move.SingleMove(player.piece(), player.location(), ScotlandYard.Ticket.SECRET, destination));
-						}
-					}
-					if (!player.has(transport.requiredTicket())) continue;
-					builder.add(new Move.SingleMove(player.piece(), player.location(), transport.requiredTicket(), destination));
-				}
-			}
-			return builder.build();
-		}
-
-		private ImmutableSet<Move.DoubleMove> getAvailableDoubleMoves(Player player) {
-			if (!player.isMrX()) { throw new IllegalArgumentException(); }
-			ImmutableSet.Builder<Move.DoubleMove> builder = new ImmutableSet.Builder<>();
-			ImmutableSet<Move.SingleMove> singleMoves = getAvailableSingleMoves(player);
-			for (Move.SingleMove firstMove : singleMoves) {
-				for (Move.SingleMove secondMove : getAvailableSecondMoves(player, firstMove)) {
-					builder.add(new Move.DoubleMove(
-							player.piece(),
-							player.location(),
-							firstMove.ticket,
-							firstMove.destination,
-							secondMove.ticket,
-							secondMove.destination));
-				}
-			}
-			return builder.build();
-		}
-
-		// only returns the available second moves
-		private ImmutableSet<Move.SingleMove> getAvailableSecondMoves(Player player, Move.SingleMove firstMove) {
-			if (!player.isMrX()) { throw new IllegalArgumentException(); }
-			ImmutableSet.Builder<Move.SingleMove> builder = new ImmutableSet.Builder<>();
-			for (Integer secondDestination : setup.graph.adjacentNodes(firstMove.destination)) {
-				Optional<ImmutableSet<ScotlandYard.Transport>> allTransport = setup.graph.edgeValue(firstMove.destination, secondDestination);
-				if (allTransport.isEmpty()) continue;
-				for (ScotlandYard.Transport transport : allTransport.get()) {
-					// account for MrX's secret tickets
-					boolean mrXCanUseSecretTicket = false;
-					if (player.hasAtLeast(ScotlandYard.Ticket.SECRET, 2)) {
-						mrXCanUseSecretTicket = true;
-					} else if (player.has(ScotlandYard.Ticket.SECRET)) {
-						if (firstMove.ticket != ScotlandYard.Ticket.SECRET) {
-							mrXCanUseSecretTicket = true;
-						}
-					}
-					if (mrXCanUseSecretTicket) {
-						builder.add(new Move.SingleMove(player.piece(), firstMove.destination, ScotlandYard.Ticket.SECRET, secondDestination));
-					}
-					if (!player.has(transport.requiredTicket())) continue;
-					if ((firstMove.ticket == transport.requiredTicket())
-							&& (!player.hasAtLeast(transport.requiredTicket(), 2))) continue;
-					builder.add(new Move.SingleMove(player.piece(), firstMove.destination, transport.requiredTicket(), secondDestination));
-				}
-			}
-			return builder.build();
 		}
 
 		@Nonnull
@@ -239,7 +161,6 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		public GameState advance(Move move) {
 			if(!moves.contains(move)) throw new IllegalArgumentException("Illegal move: "+move);
 
-			//if
 
 			return null;
 		}
