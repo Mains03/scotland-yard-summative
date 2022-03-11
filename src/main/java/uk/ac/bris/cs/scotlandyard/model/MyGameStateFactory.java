@@ -11,7 +11,6 @@ import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 import uk.ac.bris.cs.scotlandyard.model.Piece.MrX;
 
-import java.awt.*;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
@@ -107,6 +106,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				if (tickets.size() == 1) {
 					if (!player.has(tickets.get(0))) return false;
 				} else {
+					if (!player.has(ScotlandYard.Ticket.DOUBLE)) return false;
 					if (tickets.get(0) == tickets.get(1)) {
 						if (!player.hasAtLeast(tickets.get(0), 2)) return false;
 					} else {
