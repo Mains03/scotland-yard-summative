@@ -5,6 +5,7 @@ import com.google.common.collect.ImmutableList;
 import javax.annotation.Nonnull;
 
 import com.google.common.collect.ImmutableSet;
+import com.google.common.collect.Lists;
 import com.google.common.graph.ImmutableValueGraph;
 import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
@@ -84,11 +85,12 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			};
 
 			ImmutableSet.Builder<Move> builder = new ImmutableSet.Builder<>();
-			remaining.stream().forEach(piece -> {
-				Player player = getPlayerByPiece.apply(piece);
-				builder.addAll(new MoveGeneration.SingleMoveGeneration(graph, player).generateMoves());
-				if (piece.isMrX()) builder.addAll(new MoveGeneration.DoubleMoveGeneration(graph, player).generateMoves());
-			});
+			for (Piece piece : remaining) {
+				builder.addAll(generatePossibleMoves(
+						graph,
+						getPlayerByPiece.apply(piece)
+				));
+			}
 			return builder.build();
 		}
 
@@ -97,7 +99,22 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				final Player player
 		) {
 			Predicate<Move> isMovePossible = move -> {
-				return false;
+				List<ScotlandYard.Ticket> tickets = Lists.newArrayList(move.tickets());
+				if (player.isDetective()) {
+					if (tickets.size() > 1) return false;
+					if (tickets.contains(ScotlandYard.Ticket.SECRET)) return false;
+				}
+				if (tickets.size() == 1) {
+					if (!player.has(tickets.get(0))) return false;
+				} else {
+					if (tickets.get(0) == tickets.get(1)) {
+						if (!player.hasAtLeast(tickets.get(0), 2)) return false;
+					} else {
+						if (!player.has(tickets.get(0))) return false;
+						if (!player.has(tickets.get(1))) return false;
+					}
+				}
+				return true;
 			};
 
 			return ImmutableSet.copyOf(
