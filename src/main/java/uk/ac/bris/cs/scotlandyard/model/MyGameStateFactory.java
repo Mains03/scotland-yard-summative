@@ -1,22 +1,21 @@
 package uk.ac.bris.cs.scotlandyard.model;
 
-// not sure if we are supposed to import this
-// import com.google.common.base.Optional;
 import com.google.common.collect.ImmutableList;
 
 import javax.annotation.Nonnull;
 
-import com.google.common.collect.ImmutableMultimap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.graph.ImmutableValueGraph;
 import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
 import uk.ac.bris.cs.scotlandyard.model.Piece.MrX;
 
+import java.awt.*;
 import java.util.*;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.BiFunction;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 
@@ -96,6 +95,56 @@ public final class MyGameStateFactory implements Factory<GameState> {
 				builder.addAll(new MoveGeneration.SingleMoveGeneration(graph, player).generateMoves());
 				if (player.isMrX()) builder.addAll(new MoveGeneration.DoubleMoveGeneration(graph, player).generateMoves());
 			});
+			return builder.build();
+		}
+
+		private ImmutableSet<Move> generatePossibleMoves(
+				final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+				final Player player
+		) {
+			Predicate<Move> isMovePossible = move -> {
+				return false;
+			};
+
+			return ImmutableSet.copyOf(
+					generateAllMoves(graph, player).stream()
+							.filter(isMovePossible)
+							.collect(Collectors.toList())
+			);
+		}
+
+		// all moves available at the current location even if the player can't do them
+		private ImmutableSet<Move> generateAllMoves(
+				final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+				final Player player
+		) {
+			ImmutableSet.Builder<Move> builder = new ImmutableSet.Builder<>();
+			for (Integer destination : graph.adjacentNodes(player.location())) {
+				for (ScotlandYard.Transport transport : graph.edgeValue(player.location(), destination).get()) {
+					builder.add(new Move.SingleMove(
+							player.piece(), player.location(), transport.requiredTicket(), destination
+					));
+					for (Integer destination2 : graph.adjacentNodes(destination)) {
+						for (ScotlandYard.Transport transport2 : graph.edgeValue(destination, destination2).get()) {
+							builder.add(new Move.DoubleMove(
+									player.piece(), player.location(), transport.requiredTicket(), destination, transport2.requiredTicket(), destination2
+							));
+							builder.add(new Move.DoubleMove(
+									player.piece(), player.location(), ScotlandYard.Ticket.SECRET, destination, transport2.requiredTicket(), destination2
+							));
+						}
+						builder.add(new Move.DoubleMove(
+								player.piece(), player.location(), transport.requiredTicket(), destination, ScotlandYard.Ticket.SECRET, destination2
+						));
+						builder.add(new Move.DoubleMove(
+								player.piece(), player.location(), ScotlandYard.Ticket.SECRET, destination, ScotlandYard.Ticket.SECRET, destination2
+						));
+					}
+				}
+				builder.add(new Move.SingleMove(
+						player.piece(), player.location(), ScotlandYard.Ticket.SECRET, destination
+				));
+			}
 			return builder.build();
 		}
 
@@ -183,9 +232,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 				}
 			});
-
-			 */
-
+			*/
 
 
 			return null;
