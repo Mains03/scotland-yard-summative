@@ -6,10 +6,10 @@ import com.google.common.graph.ImmutableValueGraph;
 import java.util.Objects;
 import java.util.Optional;
 
-public interface MoveGeneration {
-    public ImmutableSet<Move> generateMoves();
+public abstract class MoveGeneration {
+    public abstract ImmutableSet<Move> generateMoves();
 
-    public final class SingleMoveGeneration implements MoveGeneration {
+    public static final class SingleMoveGeneration extends MoveGeneration {
         private final ImmutableSet<Move.SingleMove> moves;
 
         public SingleMoveGeneration(
@@ -141,7 +141,7 @@ public interface MoveGeneration {
         }
     }
 
-    public class DoubleMoveGeneration implements MoveGeneration {
+    public static final class DoubleMoveGeneration extends MoveGeneration {
         private final ImmutableSet<Move.DoubleMove> moves;
 
         public DoubleMoveGeneration(
