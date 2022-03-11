@@ -56,16 +56,23 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			this.log = log;
 			this.mrX = mrX;
 			this.detectives = detectives;
-			moves = generateMoves(setup.graph, createMovableList(mrX, detectives));
+			moves = generateMoves(setup.graph, remaining);
 			winner = ImmutableSet.of();
 		}
 
-		private List<Player> createMovableList(Player mrX, ImmutableList<Player> detectives) {
-			List<Player> movable = new ArrayList<>();
-			movable.add(mrX);
-			movable.addAll(detectives);
-			return movable;
+
+		private Player getPlayer(Piece piece) {
+			if (piece.isMrX()) return mrX;
+			else {
+				return detectives.stream()
+						.filter(p -> p.piece() == piece)
+						.findFirst()
+						.stream()
+						.collect(Collectors.toList())
+						.get(0);
+			}
 		}
+
 
 		private void inspectDetectives(final ImmutableList<Player> detectives) {
 			if (detectives.stream() // check for double tickets
@@ -80,10 +87,12 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 		private ImmutableSet<Move> generateMoves(
 				final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-				final List<Player> players
+				final Set<Piece> pieces
 		) {
+			Set<Player> players = pieces.stream().map(p -> getPlayer(p)).collect(Collectors.toSet());
 			ImmutableSet.Builder<Move> builder = new ImmutableSet.Builder<>();
 			players.stream().forEach(player -> {
+
 				builder.addAll(new MoveGeneration.SingleMoveGeneration(graph, player).generateMoves());
 				if (player.isMrX()) builder.addAll(new MoveGeneration.DoubleMoveGeneration(graph, player).generateMoves());
 			});
@@ -166,14 +175,17 @@ public final class MyGameStateFactory implements Factory<GameState> {
 			/*
 			GameState gs = move.accept(new Move.Visitor<>() {
 				@Override public visit(Move.SingleMove singleMove){
-
+					Piece piece = singleMove.commencedBy();
+					ScotlandYard.Ticket ticket =
 				}
 				@Override public visit(Move.DoubleMove doubleMove){
 
 
 				}
 			});
-			*/
+
+			 */
+
 
 
 			return null;
