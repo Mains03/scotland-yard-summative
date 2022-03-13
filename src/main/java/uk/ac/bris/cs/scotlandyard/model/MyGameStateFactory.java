@@ -279,18 +279,28 @@ public final class MyGameStateFactory implements Factory<GameState> {
         }
 
         private ImmutableSet<Piece> newRemaining(Move move) {
+            // generate the new list of players to move
             if (move.commencedBy().isMrX()) {
+                // all detectives now move
                 return ImmutableSet.copyOf(
                         detectives.stream()
                                 .map(player -> player.piece())
                                 .collect(Collectors.toList())
                 );
             } else {
+                // remove the player who just moved from the remaining
                 Collection<Piece> currentRemaining = remaining.stream()
                         .filter(piece -> !move.commencedBy().webColour().equals(piece.webColour()))
                         .collect(Collectors.toList());
-                if (currentRemaining.isEmpty()) return ImmutableSet.of(MrX.MRX);
-                else return ImmutableSet.copyOf(currentRemaining);
+                // inspect the new remaining
+                if (currentRemaining.isEmpty()) {
+                    // all detectives have moved, MrX's turn
+                    return ImmutableSet.of(MrX.MRX);
+                }
+                else {
+                    // other detectives yet to move
+                    return ImmutableSet.copyOf(currentRemaining);
+                }
             }
         }
 
@@ -299,6 +309,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
         }
 
         private Player newPlayer(Move move, Player player) {
+            // determines the destination of the player depending on the move type
             Move.Visitor<Integer> destinationVisitor = new Move.Visitor<Integer>() {
                 @Override
                 public Integer visit(Move.SingleMove move) {
@@ -311,16 +322,20 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 }
             };
 
+            // only update the player who moved
             if (!move.commencedBy().webColour().equals(player.piece().webColour())) return player;
             else {
+                // update the player
                 player = player.use(move.tickets());
                 return player.at(move.accept(destinationVisitor));
             }
         }
 
         private ImmutableList<LogEntry> newLog(Move move) {
+            // only update the log if MrX moved
             if (!move.commencedBy().webColour().equals(mrX.piece().webColour())) return log;
             else {
+                // generate log entry depending on the move type
                 Move.Visitor<Collection<LogEntry>> logEntryVisitor = new Move.Visitor<Collection<LogEntry>>() {
                     @Override
                     public Collection<LogEntry> visit(Move.SingleMove move) {
@@ -338,6 +353,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                     }
                 };
 
+                // generate the new log
                 Collection<LogEntry> newLog = new ArrayList<>();
                 newLog.addAll(log);
                 newLog.addAll(move.accept(logEntryVisitor));
