@@ -77,7 +77,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
             // check if MrX has escaped
             if (log.size() == 24) return ImmutableSet.of(mrX.piece());
             // check if detectives can move
-            if (detectivesOutOfMoves(graph, detectives)) return ImmutableSet.of(MrX.MRX);
+            if (remaining.size() == detectives.size()) {
+                if (detectivesOutOfMoves(graph, detectives)) return ImmutableSet.of(MrX.MRX);
+            }
             if (remaining.contains(MrX.MRX)) {
                 // check if MrX can move
                 if (mrXTrapped(graph, mrX, detectives)) return detectivesWin(detectives);
