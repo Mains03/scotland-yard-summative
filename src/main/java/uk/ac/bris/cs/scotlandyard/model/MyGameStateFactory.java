@@ -134,7 +134,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                     // COvering double tickets for MrX
                     // If MrX doesn't have a double ticket
                     if (!player.has(ScotlandYard.Ticket.DOUBLE)) return false;
-                    // If it's MrX's last move he can't use two tickets
+                    // If it's MrX's last move they can't use two tickets
                     if (setup.moves.size() == 1) return false;
                     List<ScotlandYard.Ticket> tickets = Lists.newArrayList(move.tickets());
                     // If MrX is using two of the same ticket they don't have
@@ -164,12 +164,16 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 final Player player
         ) {
             ImmutableSet.Builder<Move> builder = new ImmutableSet.Builder<>();
+            // iterate over neighbouring nodes at player's location
             for (Integer destination : graph.adjacentNodes(player.location())) {
+                // iterate over transport available from player's location to destination
                 for (ScotlandYard.Transport transport : graph.edgeValue(player.location(), destination).get()) {
                     builder.add(new Move.SingleMove(
                             player.piece(), player.location(), transport.requiredTicket(), destination
                     ));
+                    // iterate over neighbouring nodes at destination
                     for (Integer destination2 : graph.adjacentNodes(destination)) {
+                        // iterate over transport available from destination to destination2
                         for (ScotlandYard.Transport transport2 : graph.edgeValue(destination, destination2).get()) {
                             builder.add(new Move.DoubleMove(
                                     player.piece(), player.location(), transport.requiredTicket(), destination, transport2.requiredTicket(), destination2
