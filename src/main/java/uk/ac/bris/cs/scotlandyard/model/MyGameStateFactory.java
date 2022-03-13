@@ -14,7 +14,6 @@ import uk.ac.bris.cs.scotlandyard.model.Piece.MrX;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
@@ -33,7 +32,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private final Player mrX;
 		private final ImmutableList<Player> detectives;
 		private final ImmutableSet<Move> moves;
-		// I think we can determine the winner when a new game state is constructed
+        // TODO: determine winner
 		private final ImmutableSet<Piece> winner;
 
         private MyGameState(
