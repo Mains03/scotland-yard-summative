@@ -5,6 +5,7 @@ import com.google.common.graph.ImmutableValueGraph;
 
 import java.util.*;
 import java.util.function.Consumer;
+import java.util.function.Predicate;
 
 public final class MoveGenerator {
     private abstract class UnclaimedMove {
@@ -57,24 +58,34 @@ public final class MoveGenerator {
 
     private final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph;
     private final Collection<Player> players;
-
+    private final Collection<Piece> pieces;
 
     public MoveGenerator(
             final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-            final Collection<Player> players
+            final Collection<Player> players,
+            final Collection<Piece> pieces
     ) {
         this.graph = graph;
         this.players = players;
+        this.pieces = pieces;
     }
 
     public ImmutableSet<Move> generateMoves() {
         Collection<UnclaimedMove> unclaimedMoves = new ArrayList<>();
-        Consumer<Player> consumeMoves = player -> {
-            var moves = generateUnclaimedMoves(player.location());
-            unclaimedMoves.addAll(moves);
+        Consumer<Piece> pieceConsumer = piece -> {
+            Consumer<Player> playerConsumer = player -> {
+                Collection<UnclaimedMove> moves = generateUnclaimedMoves(player.location());
+                unclaimedMoves.addAll(moves);
+            };
+            getPlayerByPiece(piece).ifPresent(playerConsumer);
         };
-        players.stream().forEach(consumeMoves);
+        pieces.stream().forEach(pieceConsumer);
         return generateMoves(unclaimedMoves);
+    }
+
+    private Optional<Player> getPlayerByPiece(Piece piece) {
+        Predicate<Player> playerFilter = player -> player.piece().webColour().equals(piece.webColour());
+        return players.stream().filter(playerFilter).findFirst();
     }
 
     private Collection<UnclaimedMove> generateUnclaimedMoves(Integer location) {
