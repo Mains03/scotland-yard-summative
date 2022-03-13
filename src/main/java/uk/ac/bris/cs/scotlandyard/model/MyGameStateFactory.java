@@ -31,7 +31,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private final ImmutableSet<Piece> remaining;
 		private final ImmutableList<LogEntry> log;
 		private final Player mrX;
-		private final List<Player> detectives;
+		private final ImmutableList<Player> detectives;
 		private final ImmutableSet<Move> moves;
 		// I think we can determine the winner when a new game state is constructed
 		private final ImmutableSet<Piece> winner;
@@ -265,21 +265,43 @@ public final class MyGameStateFactory implements Factory<GameState> {
         public GameState advance(Move move) {
             if (!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
 
-			/*
-			GameState gs = move.accept(new Move.Visitor<>() {
-				@Override public visit(Move.SingleMove singleMove){
-					Piece piece = singleMove.commencedBy();
-					ScotlandYard.Ticket ticket =
-				}
-				@Override public visit(Move.DoubleMove doubleMove){
+			return move.accept(new Move.Visitor<GameState>() {
+				@Override public GameState visit(Move.SingleMove singleMove) {
+                    ImmutableList<Player> newDetectives = ImmutableList.copyOf(
+                            detectives.stream()
+                                .map(detective -> newPlayer(singleMove, detective, singleMove.destination))
+                                .collect(Collectors.toList())
+                    );
 
-
+                    return new MyGameState(
+                            setup,
+                            newRemaining(singleMove, remaining),
+                            log,
+                            newPlayer(singleMove, mrX, singleMove.destination),
+                            newDetectives
+                    );
 				}
+
+				@Override public GameState visit(Move.DoubleMove doubleMove){
+                    return null;
+				}
+
+                private ImmutableSet<Piece> newRemaining(Move move, ImmutableSet<Piece> oldRemaining) {
+                    Collection<Piece> currentRemaining = oldRemaining.stream()
+                            .filter(piece -> !move.commencedBy().webColour().equals(piece.webColour()))
+                            .collect(Collectors.toList());
+                    if (currentRemaining.isEmpty()) return ImmutableSet.of(MrX.MRX);
+                    else return ImmutableSet.copyOf(currentRemaining);
+                }
+
+                private Player newPlayer(Move move, Player player, int destination) {
+                    if (!move.commencedBy().webColour().equals(player.piece().webColour())) return player;
+                    else {
+                        player = player.use(move.tickets());
+                        return player.at(destination);
+                    }
+                }
 			});
-			*/
-
-
-            return null;
         }
     }
 
