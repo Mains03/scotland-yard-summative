@@ -280,7 +280,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                     return new MyGameState(
                             setup,
                             newRemaining(singleMove, remaining),
-                            log,
+                            newLog(move, log),
                             newPlayer(singleMove, mrX, singleMove.destination),
                             newDetectives
                     );
@@ -303,6 +303,32 @@ public final class MyGameStateFactory implements Factory<GameState> {
                     else {
                         player = player.use(move.tickets());
                         return player.at(destination);
+                    }
+                }
+
+                private ImmutableList<LogEntry> newLog(Move move, ImmutableList<LogEntry> oldLog) {
+                    if (!move.commencedBy().webColour().equals(mrX.piece().webColour())) return oldLog;
+                    else {
+                        Move.Visitor<Collection<LogEntry>> logEntryVisitor = new Move.Visitor<Collection<LogEntry>>() {
+                            @Override
+                            public Collection<LogEntry> visit(Move.SingleMove move) {
+                                // TODO: check if move should be revealed
+                                return List.of(LogEntry.hidden(move.ticket));
+                            }
+
+                            @Override
+                            public Collection<LogEntry> visit(Move.DoubleMove move) {
+                                Collection<LogEntry> entries = new ArrayList<>();
+                                // TODO: check if move should be revealed
+                                entries.add(LogEntry.hidden(move.ticket1));
+                                entries.add(LogEntry.hidden(move.ticket2));
+                                return entries;
+                            }
+                        };
+
+                        Collection<LogEntry> log = List.copyOf(oldLog);
+                        log.addAll(move.accept(logEntryVisitor));
+                        return ImmutableList.copyOf(log);
                     }
                 }
 			});
