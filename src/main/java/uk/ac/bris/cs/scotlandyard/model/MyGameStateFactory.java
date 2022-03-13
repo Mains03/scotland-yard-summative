@@ -271,18 +271,12 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
 			return move.accept(new Move.Visitor<GameState>() {
 				@Override public GameState visit(Move.SingleMove singleMove) {
-                    ImmutableList<Player> newDetectives = ImmutableList.copyOf(
-                            detectives.stream()
-                                .map(detective -> newPlayer(singleMove, detective, singleMove.destination))
-                                .collect(Collectors.toList())
-                    );
-
                     return new MyGameState(
                             setup,
-                            newRemaining(singleMove, remaining),
-                            newLog(move, log),
-                            newPlayer(singleMove, mrX, singleMove.destination),
-                            newDetectives
+                            newRemaining(singleMove),
+                            newLog(singleMove),
+                            newMrX(singleMove),
+                            newDetectives(singleMove)
                     );
 				}
 
@@ -290,24 +284,40 @@ public final class MyGameStateFactory implements Factory<GameState> {
                     return null;
 				}
 
-                private ImmutableSet<Piece> newRemaining(Move move, ImmutableSet<Piece> oldRemaining) {
-                    Collection<Piece> currentRemaining = oldRemaining.stream()
+                private ImmutableSet<Piece> newRemaining(Move move) {
+                    Collection<Piece> currentRemaining = remaining.stream()
                             .filter(piece -> !move.commencedBy().webColour().equals(piece.webColour()))
                             .collect(Collectors.toList());
                     if (currentRemaining.isEmpty()) return ImmutableSet.of(MrX.MRX);
                     else return ImmutableSet.copyOf(currentRemaining);
                 }
 
-                private Player newPlayer(Move move, Player player, int destination) {
+                private Player newMrX(Move move) {
+                    return newPlayer(move, mrX);
+                }
+
+                private Player newPlayer(Move move, Player player) {
+                    Move.Visitor<Integer> destinationVisitor = new Move.Visitor<Integer>() {
+                        @Override
+                        public Integer visit(Move.SingleMove move) {
+                            return move.destination;
+                        }
+
+                        @Override
+                        public Integer visit(Move.DoubleMove move) {
+                            return move.destination2;
+                        }
+                    };
+
                     if (!move.commencedBy().webColour().equals(player.piece().webColour())) return player;
                     else {
                         player = player.use(move.tickets());
-                        return player.at(destination);
+                        return player.at(move.accept(destinationVisitor));
                     }
                 }
 
-                private ImmutableList<LogEntry> newLog(Move move, ImmutableList<LogEntry> oldLog) {
-                    if (!move.commencedBy().webColour().equals(mrX.piece().webColour())) return oldLog;
+                private ImmutableList<LogEntry> newLog(Move move) {
+                    if (!move.commencedBy().webColour().equals(mrX.piece().webColour())) return log;
                     else {
                         Move.Visitor<Collection<LogEntry>> logEntryVisitor = new Move.Visitor<Collection<LogEntry>>() {
                             @Override
@@ -326,10 +336,19 @@ public final class MyGameStateFactory implements Factory<GameState> {
                             }
                         };
 
-                        Collection<LogEntry> log = List.copyOf(oldLog);
-                        log.addAll(move.accept(logEntryVisitor));
-                        return ImmutableList.copyOf(log);
+                        Collection<LogEntry> newLog = new ArrayList<>();
+                        newLog.addAll(log);
+                        newLog.addAll(move.accept(logEntryVisitor));
+                        return ImmutableList.copyOf(newLog);
                     }
+                }
+
+                private ImmutableList<Player> newDetectives(Move move) {
+                    return ImmutableList.copyOf(
+                            detectives.stream()
+                                    .map(player -> newPlayer(move, player))
+                                    .collect(Collectors.toList())
+                    );
                 }
 			});
         }
