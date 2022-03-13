@@ -5,7 +5,6 @@ import com.google.common.collect.ImmutableList;
 import javax.annotation.Nonnull;
 
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Lists;
 import com.google.common.graph.ImmutableValueGraph;
 import uk.ac.bris.cs.scotlandyard.model.Board.GameState;
 import uk.ac.bris.cs.scotlandyard.model.ScotlandYard.Factory;
@@ -14,8 +13,6 @@ import uk.ac.bris.cs.scotlandyard.model.Piece.MrX;
 import java.util.*;
 import java.util.List;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.function.Function;
-import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 
@@ -60,22 +57,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
             this.log = log;
             this.mrX = mrX;
             this.detectives = detectives;
-            moves = generateMoves(setup.graph, remaining);
+            moves = generateMoves(setup.graph, mrX, detectives, remaining);
             winner = ImmutableSet.of();
         }
-
-        // Gets the reference of a player from the provided piece
-        private Player getPlayer(Piece piece) {
-            if (piece.isMrX()) return mrX;
-            else {
-                return detectives.stream()
-                        .filter(p -> p.piece() == piece)
-                        .findFirst()
-                        .stream().toList()
-                        .get(0);
-            }
-        }
-
 
         private void inspectDetectives(final ImmutableList<Player> detectives) {
             if (detectives.stream() // check for double tickets
@@ -97,112 +81,18 @@ public final class MyGameStateFactory implements Factory<GameState> {
         // Generates all possible moves for each player
         private ImmutableSet<Move> generateMoves(
                 final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-                final Set<Piece> pieces
+                final Player mrX,
+                final Collection<Player> detectives,
+                final Collection<Piece> pieces
         ) {
-            Set<Player> players = pieces.stream().map(p -> getPlayer(p)).collect(Collectors.toSet());
-            ImmutableSet.Builder<Move> builder = new ImmutableSet.Builder<>();
-            players.stream().forEach(player -> {
-                builder.addAll(generatePossibleMoves(graph, player));
-            });
-            return builder.build();
-        }
-
-        private ImmutableSet<Move> generatePossibleMoves(
-                final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-                final Player player
-        ) {
-
-            // Used to distinguish between single and double moves from stream to check
-            // destination, destination1, destination2
-            Move.Visitor<Boolean> isValid = new Move.Visitor<>() {
-                @Override
-                public Boolean visit(Move.SingleMove move) {
-                    if (detectives.stream().anyMatch(detective -> detective.location() == move.destination))
-                        return false;
-                    return true;
-                }
-
-                @Override
-                public Boolean visit(Move.DoubleMove move) {
-                    if (detectives.stream().anyMatch(detective -> detective.location() == move.destination1 || detective.location() == move.destination2))
-                        return false;
-                    return true;
-                }
-            };
-
-
-            Predicate<Move> isMovePossible = move -> {
-                List<ScotlandYard.Ticket> tickets = Lists.newArrayList(move.tickets());
-                // If detective tries to use a secret ticket or multiple tickets
-                if (player.isDetective()) {
-                    if (tickets.size() > 1) return false;
-                    if (tickets.contains(ScotlandYard.Ticket.SECRET)) return false;
-                }
-
-                if (tickets.size() == 1) {
-                    // If player doesn't have the ticket
-                    if (!player.has(tickets.get(0))) return false;
-                } else {
-                    // COvering double tickets for MrX
-                    // If MrX doesn't have a double ticket
-                    if (!player.has(ScotlandYard.Ticket.DOUBLE)) return false;
-                    // If it's MrX's last move he can't use two tickets
-                    if (setup.moves.size() == 1) return false;
-                    // If MrX is using two of the same ticket they don't have
-                    if (tickets.get(0) == tickets.get(1)) {
-                        if (!player.hasAtLeast(tickets.get(0), 2)) return false;
-                    } else {
-                        // If MrX is using two different tickets
-                        if (!player.has(tickets.get(0))) return false;
-                        if (!player.has(tickets.get(1))) return false;
-                    }
-                }
-                // Checks moves don't intersect detectives' locations
-                if (!move.accept(isValid).equals(true)) return false;
-
-                return true;
-            };
-
-            return ImmutableSet.copyOf(
-                    generateAllMoves(graph, player).stream()
-                            .filter(isMovePossible)
-                            .collect(Collectors.toList())
-            );
-        }
-
-        // all moves available at the current location even if the player can't do them
-        private ImmutableSet<Move> generateAllMoves(
-                final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-                final Player player
-        ) {
-            ImmutableSet.Builder<Move> builder = new ImmutableSet.Builder<>();
-            for (Integer destination : graph.adjacentNodes(player.location())) {
-                for (ScotlandYard.Transport transport : graph.edgeValue(player.location(), destination).get()) {
-                    builder.add(new Move.SingleMove(
-                            player.piece(), player.location(), transport.requiredTicket(), destination
-                    ));
-                    for (Integer destination2 : graph.adjacentNodes(destination)) {
-                        for (ScotlandYard.Transport transport2 : graph.edgeValue(destination, destination2).get()) {
-                            builder.add(new Move.DoubleMove(
-                                    player.piece(), player.location(), transport.requiredTicket(), destination, transport2.requiredTicket(), destination2
-                            ));
-                            builder.add(new Move.DoubleMove(
-                                    player.piece(), player.location(), ScotlandYard.Ticket.SECRET, destination, transport2.requiredTicket(), destination2
-                            ));
-                        }
-                        builder.add(new Move.DoubleMove(
-                                player.piece(), player.location(), transport.requiredTicket(), destination, ScotlandYard.Ticket.SECRET, destination2
-                        ));
-                        builder.add(new Move.DoubleMove(
-                                player.piece(), player.location(), ScotlandYard.Ticket.SECRET, destination, ScotlandYard.Ticket.SECRET, destination2
-                        ));
-                    }
-                }
-                builder.add(new Move.SingleMove(
-                        player.piece(), player.location(), ScotlandYard.Ticket.SECRET, destination
-                ));
-            }
-            return builder.build();
+            Collection<Player> players = new ArrayList<>();
+            players.add(mrX);
+            players.addAll(detectives);
+            return new MoveGenerator(
+                    graph,
+                    players,
+                    pieces
+            ).generateMoves();
         }
 
         @Nonnull
