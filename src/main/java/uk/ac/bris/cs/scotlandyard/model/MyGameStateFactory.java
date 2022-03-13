@@ -101,9 +101,9 @@ public final class MyGameStateFactory implements Factory<GameState> {
         ) {
             Set<Player> players = pieces.stream().map(p -> getPlayer(p)).collect(Collectors.toSet());
             ImmutableSet.Builder<Move> builder = new ImmutableSet.Builder<>();
-            players.stream().forEach(player -> {
+            for (Player player : players) {
                 builder.addAll(generatePossibleMoves(graph, player));
-            });
+            }
             return builder.build();
         }
 
