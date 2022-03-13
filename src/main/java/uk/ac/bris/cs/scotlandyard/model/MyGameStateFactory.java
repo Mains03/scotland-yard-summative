@@ -111,43 +111,32 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 final ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
                 final Player player
         ) {
-
             // Used to distinguish between single and double moves from stream to check
             // destination, destination1, destination2
-            Move.Visitor<Boolean> isValid = new Move.Visitor<>() {
+            Move.Visitor<Boolean> isMoveValidVisitor = new Move.Visitor<>() {
                 @Override
                 public Boolean visit(Move.SingleMove move) {
+                    // check if destination is occupied
                     if (detectives.stream().anyMatch(detective -> detective.location() == move.destination))
                         return false;
+                    if (!player.has(move.ticket)) return false;
                     return true;
                 }
 
                 @Override
                 public Boolean visit(Move.DoubleMove move) {
-                    if (detectives.stream().anyMatch(detective -> detective.location() == move.destination1 || detective.location() == move.destination2))
+                    // check if destination is occupied
+                    if (detectives.stream().anyMatch(
+                            detective -> (detective.location() == move.destination1)
+                                    || (detective.location() == move.destination2)
+                    ))
                         return false;
-                    return true;
-                }
-            };
-
-
-            Predicate<Move> isMovePossible = move -> {
-                List<ScotlandYard.Ticket> tickets = Lists.newArrayList(move.tickets());
-                // If detective tries to use a secret ticket or multiple tickets
-                if (player.isDetective()) {
-                    if (tickets.size() > 1) return false;
-                    if (tickets.contains(ScotlandYard.Ticket.SECRET)) return false;
-                }
-
-                if (tickets.size() == 1) {
-                    // If player doesn't have the ticket
-                    if (!player.has(tickets.get(0))) return false;
-                } else {
                     // COvering double tickets for MrX
                     // If MrX doesn't have a double ticket
                     if (!player.has(ScotlandYard.Ticket.DOUBLE)) return false;
                     // If it's MrX's last move he can't use two tickets
                     if (setup.moves.size() == 1) return false;
+                    List<ScotlandYard.Ticket> tickets = Lists.newArrayList(move.tickets());
                     // If MrX is using two of the same ticket they don't have
                     if (tickets.get(0) == tickets.get(1)) {
                         if (!player.hasAtLeast(tickets.get(0), 2)) return false;
@@ -156,12 +145,11 @@ public final class MyGameStateFactory implements Factory<GameState> {
                         if (!player.has(tickets.get(0))) return false;
                         if (!player.has(tickets.get(1))) return false;
                     }
+                    return true;
                 }
-                // Checks moves don't intersect detectives' locations
-                if (!move.accept(isValid).equals(true)) return false;
-
-                return true;
             };
+
+            Predicate<Move> isMovePossible = move -> move.accept(isMoveValidVisitor);
 
             return ImmutableSet.copyOf(
                     generateAllMoves(graph, player).stream()
