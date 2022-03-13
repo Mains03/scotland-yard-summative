@@ -279,11 +279,19 @@ public final class MyGameStateFactory implements Factory<GameState> {
         }
 
         private ImmutableSet<Piece> newRemaining(Move move) {
-            Collection<Piece> currentRemaining = remaining.stream()
-                    .filter(piece -> !move.commencedBy().webColour().equals(piece.webColour()))
-                    .collect(Collectors.toList());
-            if (currentRemaining.isEmpty()) return ImmutableSet.of(MrX.MRX);
-            else return ImmutableSet.copyOf(currentRemaining);
+            if (move.commencedBy().isMrX()) {
+                return ImmutableSet.copyOf(
+                        detectives.stream()
+                                .map(player -> player.piece())
+                                .collect(Collectors.toList())
+                );
+            } else {
+                Collection<Piece> currentRemaining = remaining.stream()
+                        .filter(piece -> !move.commencedBy().webColour().equals(piece.webColour()))
+                        .collect(Collectors.toList());
+                if (currentRemaining.isEmpty()) return ImmutableSet.of(MrX.MRX);
+                else return ImmutableSet.copyOf(currentRemaining);
+            }
         }
 
         private Player newMrX(Move move) {
