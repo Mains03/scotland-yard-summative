@@ -129,6 +129,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
             for (int adjacentNode : graph.adjacentNodes(detective.location())) {
                 if (detectiveCanTravelTo(graph, detective, adjacentNode)) return true;
             }
+
             return false;
         }
 
@@ -389,7 +390,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
             );
         }
 
-        private ImmutableSet<Piece> newRemaining(Move move) {
+        private ImmutableSet<Piece> newRemaining(Move move) { //,ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph) {
             // generate the new list of players to move
             if (move.commencedBy().isMrX()) {
                 // all detectives now move
@@ -455,16 +456,20 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 Move.Visitor<Collection<LogEntry>> logEntryVisitor = new Move.Visitor<Collection<LogEntry>>() {
                     @Override
                     public Collection<LogEntry> visit(Move.SingleMove move) {
-                        // TODO: check if move should be revealed
-                        return List.of(LogEntry.hidden(move.ticket));
+                        if (setup.moves.get(log.size())) return List.of(LogEntry.reveal(move.ticket, move.destination));
+                        else return List.of(LogEntry.hidden(move.ticket));
                     }
 
                     @Override
                     public Collection<LogEntry> visit(Move.DoubleMove move) {
                         Collection<LogEntry> entries = new ArrayList<>();
-                        // TODO: check if move should be revealed
-                        entries.add(LogEntry.hidden(move.ticket1));
-                        entries.add(LogEntry.hidden(move.ticket2));
+
+                        if (setup.moves.get(log.size())) entries.add(LogEntry.reveal(move.ticket1, move.destination1));
+                        else entries.add(LogEntry.hidden(move.ticket1));
+
+                        if (setup.moves.get(log.size() + 1)) entries.add(LogEntry.reveal(move.ticket2, move.destination2));
+                        else entries.add(LogEntry.hidden(move.ticket2));
+
                         return entries;
                     }
                 };
