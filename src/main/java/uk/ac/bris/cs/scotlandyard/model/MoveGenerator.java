@@ -70,6 +70,7 @@ public final class MoveGenerator {
         this.pieces = pieces;
     }
 
+    // only generates moves of the available pieces
     public ImmutableSet<Move> generateMoves() {
         Collection<UnclaimedMove> unclaimedMoves = new ArrayList<>();
         Consumer<Piece> pieceConsumer = piece -> {
