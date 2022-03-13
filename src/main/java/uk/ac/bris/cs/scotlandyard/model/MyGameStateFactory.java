@@ -68,18 +68,28 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 Player mrX,
                 ImmutableList<Player> detectives
         ) {
+            // check if MrX is captured
             for (Player detective : detectives) {
                 if (detective.location() == mrX.location()) {
                     return detectivesWin(detectives);
                 }
             }
+            // check if MrX has escaped
             if (log.size() == 24) return ImmutableSet.of(mrX.piece());
-            if (mrXTrapped(graph, mrX, detectives)) return detectivesWin(detectives);
-            if (detectivesOutOfMoves(graph, detectives)) return ImmutableSet.of(MrX.MRX);
-            if (mrXStuck(graph, mrX, detectives)) return detectivesWin(detectives);
+            // check whose turn it is
+            if (remaining.contains(MrX.MRX)) {
+                // check if MrX can move
+                if (mrXTrapped(graph, mrX, detectives)) return detectivesWin(detectives);
+                if (mrXStuck(graph, mrX, detectives)) return detectivesWin(detectives);
+            } else {
+                // check if detectives can move
+                if (detectivesOutOfMoves(graph, detectives)) return ImmutableSet.of(MrX.MRX);
+            }
+            // no winner
             return ImmutableSet.of();
         }
 
+        // helper function to create the winner set
         private ImmutableSet<Piece> detectivesWin(ImmutableList<Player> detectives) {
             return ImmutableSet.copyOf(
                     detectives.stream()
@@ -93,6 +103,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 Player mrX,
                 ImmutableList<Player> detectives
         ) {
+            // check if detectives occupy all adjacent nodes
             Set<Integer> adjacentNodes = graph.adjacentNodes(mrX.location());
             if (adjacentNodes.stream()
                     .filter(location -> detectives.stream()
@@ -114,6 +125,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
                 Player detective
         ) {
+            // check if the detective can move to any adjacent node
             for (int adjacentNode : graph.adjacentNodes(detective.location())) {
                 if (detectiveCanTravelTo(graph, detective, adjacentNode)) return true;
             }
@@ -125,6 +137,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 Player detective,
                 int destination
         ) {
+            // check if the detective has any required ticket
             ImmutableSet<ScotlandYard.Transport> allTransport = graph.edgeValue(detective.location(), destination).get();
             for (ScotlandYard.Transport transport : allTransport) {
                 if (detective.has(transport.requiredTicket())) return true;
@@ -137,6 +150,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 Player mrX,
                 ImmutableList<Player> detectives
         ) {
+            // check if MrX can move to any adjacent node
             for (int adjacentNode : graph.adjacentNodes(mrX.location())) {
                 if (mrXCanTravelTo(graph, mrX, detectives, adjacentNode)) return false;
             }
@@ -149,9 +163,11 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 ImmutableList<Player> detectives,
                 int destination
         ) {
+            // ensure there's no detective at the destination
             if (detectives.stream()
                     .anyMatch(detective -> detective.location() == destination)) return false;
             if (mrX.has(ScotlandYard.Ticket.SECRET)) return true;
+            // check if MrX has any required ticket
             ImmutableSet<ScotlandYard.Transport> allTransport = graph.edgeValue(mrX.location(), destination).get();
             for (ScotlandYard.Transport transport : allTransport) {
                 if (mrX.has(transport.requiredTicket())) return true;
