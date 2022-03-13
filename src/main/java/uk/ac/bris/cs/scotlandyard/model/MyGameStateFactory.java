@@ -32,7 +32,6 @@ public final class MyGameStateFactory implements Factory<GameState> {
 		private final Player mrX;
 		private final ImmutableList<Player> detectives;
 		private final ImmutableSet<Move> moves;
-        // TODO: determine winner
 		private final ImmutableSet<Piece> winner;
 
         private MyGameState(
@@ -59,8 +58,105 @@ public final class MyGameStateFactory implements Factory<GameState> {
             this.log = log;
             this.mrX = mrX;
             this.detectives = detectives;
-            moves = generateMoves(setup.graph, remaining);
-            winner = ImmutableSet.of();
+            winner = determineWinner(setup.graph, mrX, detectives);
+            if (winner.size() == 0) moves = generateMoves(setup.graph, remaining);
+            else moves = ImmutableSet.of();
+        }
+
+        private ImmutableSet<Piece> determineWinner(
+                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+                Player mrX,
+                ImmutableList<Player> detectives
+        ) {
+            for (Player detective : detectives) {
+                if (detective.location() == mrX.location()) {
+                    return detectivesWin(detectives);
+                }
+            }
+            if (log.size() == 24) return ImmutableSet.of(mrX.piece());
+            if (mrXTrapped(graph, mrX, detectives)) return detectivesWin(detectives);
+            if (detectivesOutOfMoves(graph, detectives)) return ImmutableSet.of(MrX.MRX);
+            if (mrXStuck(graph, mrX, detectives)) return detectivesWin(detectives);
+            return ImmutableSet.of();
+        }
+
+        private ImmutableSet<Piece> detectivesWin(ImmutableList<Player> detectives) {
+            return ImmutableSet.copyOf(
+                    detectives.stream()
+                            .map(Player::piece)
+                            .collect(Collectors.toList())
+            );
+        }
+
+        private boolean mrXTrapped(
+                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+                Player mrX,
+                ImmutableList<Player> detectives
+        ) {
+            Set<Integer> adjacentNodes = graph.adjacentNodes(mrX.location());
+            if (adjacentNodes.stream()
+                    .filter(location -> detectives.stream()
+                            .noneMatch(detective -> detective.location() == location))
+                    .count() == 0)
+                return true;
+            return false;
+        }
+
+        private boolean detectivesOutOfMoves(
+                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+                ImmutableList<Player> detectives
+        ) {
+            return detectives.stream()
+                    .noneMatch(detective -> detectiveCanMove(graph, detective));
+        }
+
+        private boolean detectiveCanMove(
+                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+                Player detective
+        ) {
+            for (int adjacentNode : graph.adjacentNodes(detective.location())) {
+                if (detectiveCanTravelTo(graph, detective, adjacentNode)) return true;
+            }
+            return false;
+        }
+
+        private boolean detectiveCanTravelTo(
+                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+                Player detective,
+                int destination
+        ) {
+            ImmutableSet<ScotlandYard.Transport> allTransport = graph.edgeValue(detective.location(), destination).get();
+            for (ScotlandYard.Transport transport : allTransport) {
+                if (detective.has(transport.requiredTicket())) return true;
+            }
+            return false;
+        }
+
+        private boolean mrXStuck(
+                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+                Player mrX,
+                ImmutableList<Player> detectives
+        ) {
+            for (int adjacentNode : graph.adjacentNodes(mrX.location())) {
+                if (mrXCanTravelTo(graph, mrX, detectives, adjacentNode)) return false;
+            }
+            return true;
+        }
+
+        private boolean mrXCanTravelTo(
+                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
+                Player mrX,
+                ImmutableList<Player> detectives,
+                int destination
+        ) {
+            if (detectives.stream()
+                    .anyMatch(detective -> detective.location() == destination)) return false;
+            if (mrX.has(ScotlandYard.Ticket.SECRET)) return true;
+            ImmutableSet<ScotlandYard.Transport> allTransport = graph.edgeValue(mrX.location(), destination).get();
+            for (ScotlandYard.Transport transport : allTransport) {
+                if (mrX.has(transport.requiredTicket())) return true;
+            }
+            return false;
         }
 
         // Gets the reference of a player from the provided piece
@@ -304,7 +400,12 @@ public final class MyGameStateFactory implements Factory<GameState> {
         }
 
         private Player newMrX(Move move) {
-            return newPlayer(move, mrX);
+            if (move.commencedBy().isMrX())
+                return newPlayer(move, mrX);
+            else {
+                Move.SingleMove singleMove = (Move.SingleMove) move;
+                return mrX.give(singleMove.ticket);
+            }
         }
 
         private Player newPlayer(Move move, Player player) {
