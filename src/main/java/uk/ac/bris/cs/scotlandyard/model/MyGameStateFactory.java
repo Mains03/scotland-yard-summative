@@ -269,88 +269,80 @@ public final class MyGameStateFactory implements Factory<GameState> {
         public GameState advance(Move move) {
             if (!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
 
-			return move.accept(new Move.Visitor<GameState>() {
-				@Override public GameState visit(Move.SingleMove singleMove) {
-                    return new MyGameState(
-                            setup,
-                            newRemaining(singleMove),
-                            newLog(singleMove),
-                            newMrX(singleMove),
-                            newDetectives(singleMove)
-                    );
-				}
+            return new MyGameState(
+                    setup,
+                    newRemaining(move),
+                    newLog(move),
+                    newMrX(move),
+                    newDetectives(move)
+            );
+        }
 
-				@Override public GameState visit(Move.DoubleMove doubleMove){
-                    return null;
-				}
+        private ImmutableSet<Piece> newRemaining(Move move) {
+            Collection<Piece> currentRemaining = remaining.stream()
+                    .filter(piece -> !move.commencedBy().webColour().equals(piece.webColour()))
+                    .collect(Collectors.toList());
+            if (currentRemaining.isEmpty()) return ImmutableSet.of(MrX.MRX);
+            else return ImmutableSet.copyOf(currentRemaining);
+        }
 
-                private ImmutableSet<Piece> newRemaining(Move move) {
-                    Collection<Piece> currentRemaining = remaining.stream()
-                            .filter(piece -> !move.commencedBy().webColour().equals(piece.webColour()))
-                            .collect(Collectors.toList());
-                    if (currentRemaining.isEmpty()) return ImmutableSet.of(MrX.MRX);
-                    else return ImmutableSet.copyOf(currentRemaining);
+        private Player newMrX(Move move) {
+            return newPlayer(move, mrX);
+        }
+
+        private Player newPlayer(Move move, Player player) {
+            Move.Visitor<Integer> destinationVisitor = new Move.Visitor<Integer>() {
+                @Override
+                public Integer visit(Move.SingleMove move) {
+                    return move.destination;
                 }
 
-                private Player newMrX(Move move) {
-                    return newPlayer(move, mrX);
+                @Override
+                public Integer visit(Move.DoubleMove move) {
+                    return move.destination2;
                 }
+            };
 
-                private Player newPlayer(Move move, Player player) {
-                    Move.Visitor<Integer> destinationVisitor = new Move.Visitor<Integer>() {
-                        @Override
-                        public Integer visit(Move.SingleMove move) {
-                            return move.destination;
-                        }
+            if (!move.commencedBy().webColour().equals(player.piece().webColour())) return player;
+            else {
+                player = player.use(move.tickets());
+                return player.at(move.accept(destinationVisitor));
+            }
+        }
 
-                        @Override
-                        public Integer visit(Move.DoubleMove move) {
-                            return move.destination2;
-                        }
-                    };
-
-                    if (!move.commencedBy().webColour().equals(player.piece().webColour())) return player;
-                    else {
-                        player = player.use(move.tickets());
-                        return player.at(move.accept(destinationVisitor));
+        private ImmutableList<LogEntry> newLog(Move move) {
+            if (!move.commencedBy().webColour().equals(mrX.piece().webColour())) return log;
+            else {
+                Move.Visitor<Collection<LogEntry>> logEntryVisitor = new Move.Visitor<Collection<LogEntry>>() {
+                    @Override
+                    public Collection<LogEntry> visit(Move.SingleMove move) {
+                        // TODO: check if move should be revealed
+                        return List.of(LogEntry.hidden(move.ticket));
                     }
-                }
 
-                private ImmutableList<LogEntry> newLog(Move move) {
-                    if (!move.commencedBy().webColour().equals(mrX.piece().webColour())) return log;
-                    else {
-                        Move.Visitor<Collection<LogEntry>> logEntryVisitor = new Move.Visitor<Collection<LogEntry>>() {
-                            @Override
-                            public Collection<LogEntry> visit(Move.SingleMove move) {
-                                // TODO: check if move should be revealed
-                                return List.of(LogEntry.hidden(move.ticket));
-                            }
-
-                            @Override
-                            public Collection<LogEntry> visit(Move.DoubleMove move) {
-                                Collection<LogEntry> entries = new ArrayList<>();
-                                // TODO: check if move should be revealed
-                                entries.add(LogEntry.hidden(move.ticket1));
-                                entries.add(LogEntry.hidden(move.ticket2));
-                                return entries;
-                            }
-                        };
-
-                        Collection<LogEntry> newLog = new ArrayList<>();
-                        newLog.addAll(log);
-                        newLog.addAll(move.accept(logEntryVisitor));
-                        return ImmutableList.copyOf(newLog);
+                    @Override
+                    public Collection<LogEntry> visit(Move.DoubleMove move) {
+                        Collection<LogEntry> entries = new ArrayList<>();
+                        // TODO: check if move should be revealed
+                        entries.add(LogEntry.hidden(move.ticket1));
+                        entries.add(LogEntry.hidden(move.ticket2));
+                        return entries;
                     }
-                }
+                };
 
-                private ImmutableList<Player> newDetectives(Move move) {
-                    return ImmutableList.copyOf(
-                            detectives.stream()
-                                    .map(player -> newPlayer(move, player))
-                                    .collect(Collectors.toList())
-                    );
-                }
-			});
+                Collection<LogEntry> newLog = new ArrayList<>();
+                newLog.addAll(log);
+                newLog.addAll(move.accept(logEntryVisitor));
+                return ImmutableList.copyOf(newLog);
+            }
+        }
+
+        private ImmutableList<Player> newDetectives(Move move) {
+            return ImmutableList.copyOf(
+                    detectives.stream()
+                            .map(player -> newPlayer(move, player))
+                            .collect(Collectors.toList())
+            );
         }
     }
 
