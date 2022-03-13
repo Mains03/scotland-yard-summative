@@ -6,6 +6,7 @@ import com.google.common.graph.ImmutableValueGraph;
 import java.util.*;
 import java.util.function.Consumer;
 import java.util.function.Predicate;
+import java.util.stream.Collectors;
 
 public final class MoveGenerator {
     private abstract class UnclaimedMove {
@@ -53,6 +54,42 @@ public final class MoveGenerator {
         @Override
         boolean isSingleMove() {
             return false;
+        }
+    }
+
+    private final class FilterOccupiedMoves implements Move.Visitor<Boolean> {
+        private final Collection<Player> players;
+        private final Collection<Move> moves;
+
+        FilterOccupiedMoves(
+                final Collection<Player> players,
+                final Collection<Move> moves) {
+            this.players = players;
+            this.moves = moves;
+        }
+
+        public Collection<Move> filter() {
+            Predicate<Move> moveFilter = move -> move.accept(this);
+            return moves.stream().filter(moveFilter).collect(Collectors.toList());
+        }
+
+        @Override
+        public Boolean visit(Move.SingleMove move) {
+            Predicate<Player> predicate = player -> player.location() != move.destination;
+            return players.stream()
+                    .filter(player -> player.piece() != move.commencedBy())
+                    .noneMatch(predicate);
+        }
+
+        @Override
+        public Boolean visit(Move.DoubleMove move) {
+            Predicate<Player> predicate = player -> {
+                return (player.location() != move.destination1)
+                        && (player.location() != move.destination2);
+            };
+            return players.stream()
+                    .filter(player -> player.piece() != move.commencedBy())
+                    .noneMatch(predicate);
         }
     }
 
@@ -119,10 +156,10 @@ public final class MoveGenerator {
     }
 
     private ImmutableSet<Move> generateMoves(Collection<UnclaimedMove> unclaimedMoves) {
-        ImmutableSet.Builder<Move> builder = new ImmutableSet.Builder<>();
+        Collection<Move> moves = new ArrayList<>();
         Consumer<Player> generatePlayerMoves = player -> {
             Consumer<UnclaimedMove> claimMove = unclaimedMove -> {
-                Consumer<Move> moveConsumer = move -> builder.add(move);
+                Consumer<Move> moveConsumer = move -> moves.add(move);
                 if (unclaimedMove.isDoubleMove()) {
                     claimDoubleMove(player, (UnclaimedDoubleMove) unclaimedMove)
                             .ifPresent(moveConsumer);
@@ -134,7 +171,9 @@ public final class MoveGenerator {
             unclaimedMoves.stream().forEach(claimMove);
         };
         players.stream().forEach(generatePlayerMoves);
-        return builder.build();
+        return ImmutableSet.copyOf(
+                new FilterOccupiedMoves(players, moves).filter()
+        );
     }
 
     private Optional<Move> claimDoubleMove(final Player player, final UnclaimedDoubleMove unclaimedMove) {
