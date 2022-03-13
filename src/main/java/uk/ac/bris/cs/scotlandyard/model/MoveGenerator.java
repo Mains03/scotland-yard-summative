@@ -78,7 +78,7 @@ public final class MoveGenerator {
             Predicate<Player> predicate = player -> player.location() != move.destination;
             return players.stream()
                     .filter(player -> player.piece() != move.commencedBy())
-                    .noneMatch(predicate);
+                    .allMatch(predicate);
         }
 
         @Override
@@ -89,7 +89,7 @@ public final class MoveGenerator {
             };
             return players.stream()
                     .filter(player -> player.piece() != move.commencedBy())
-                    .noneMatch(predicate);
+                    .allMatch(predicate);
         }
     }
 
