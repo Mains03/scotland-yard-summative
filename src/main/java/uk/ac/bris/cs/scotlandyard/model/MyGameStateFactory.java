@@ -291,14 +291,19 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
         private boolean detectivesCanMove() {
             for (Player detective : detectives) {
-                for (int adjacent : setup.graph.adjacentNodes(detective.location())) {
-                    ImmutableSet<ScotlandYard.Transport> allTransport = setup.graph.edgeValue(detective.location(), adjacent).get();
-                    for (ScotlandYard.Transport transport : allTransport) {
-                        if (detective.has(transport.requiredTicket())) {
-                            if (detectives.stream()
-                                    .noneMatch(otherDetective -> otherDetective.location() == adjacent)) {
-                                return true;
-                            }
+                if (detectiveCanMove(detective)) return true;
+            }
+            return false;
+        }
+
+        private boolean detectiveCanMove(Player detective) {
+            for (int adjacent : setup.graph.adjacentNodes(detective.location())) {
+                ImmutableSet<ScotlandYard.Transport> allTransport = setup.graph.edgeValue(detective.location(), adjacent).get();
+                for (ScotlandYard.Transport transport : allTransport) {
+                    if (detective.has(transport.requiredTicket())) {
+                        if (detectives.stream()
+                                .noneMatch(otherDetective -> otherDetective.location() == adjacent)) {
+                            return true;
                         }
                     }
                 }
@@ -332,7 +337,23 @@ public final class MyGameStateFactory implements Factory<GameState> {
         }
 
         private ImmutableSet<Piece> newRemaining(ImmutableSet<Piece> oldRemaining, Move move) {
-            return ImmutableSet.of();
+            if (move.commencedBy().isMrX()) {
+                return ImmutableSet.copyOf(
+                        detectives.stream()
+                                .filter(this::detectiveCanMove)
+                                .map(Player::piece)
+                                .collect(Collectors.toList())
+                );
+            } else {
+                Collection<Piece> newRemaining = remaining.stream()
+                        .filter(piece -> !move.commencedBy().webColour().equals(piece.webColour()))
+                        .collect(Collectors.toList());
+                if (newRemaining.isEmpty()) {
+                    return ImmutableSet.of(MrX.MRX);
+                } else {
+                    return ImmutableSet.copyOf(newRemaining);
+                }
+            }
         }
 
         @Nonnull
@@ -408,108 +429,6 @@ public final class MyGameStateFactory implements Factory<GameState> {
             if (!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
 
             return new MyGameState(this, move);
-        }
-
-        private ImmutableSet<Piece> newRemaining(Move move) { //,ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph) {
-            // generate the new list of players to move
-            if (move.commencedBy().isMrX()) {
-                // all detectives now move
-                return ImmutableSet.copyOf(
-                        detectives.stream()
-                                // Only allows detectives who can actually move to remain
-                                .filter(player -> generatePossibleMoves(setup.graph, player).size() != 0)
-                                .map(player -> player.piece())
-                                .collect(Collectors.toList())
-                );
-            } else {
-                // remove the player who just moved from the remaining
-                Collection<Piece> currentRemaining = remaining.stream()
-                        .filter(piece -> !move.commencedBy().webColour().equals(piece.webColour()))
-                        .collect(Collectors.toList());
-                // inspect the new remaining
-                if (currentRemaining.isEmpty()) {
-                    // all detectives have moved (or can't move), MrX's turn
-                    return ImmutableSet.of(MrX.MRX);
-                }
-                else {
-                    // other detectives yet to move
-                    return ImmutableSet.copyOf(currentRemaining);
-                }
-            }
-        }
-
-        private Player newMrX(Move move) {
-            if (move.commencedBy().isMrX())
-                return newPlayer(move, mrX);
-            else {
-                Move.SingleMove singleMove = (Move.SingleMove) move;
-                return mrX.give(singleMove.ticket);
-            }
-        }
-
-        private Player newPlayer(Move move, Player player) {
-            // determines the destination of the player depending on the move type
-            Move.Visitor<Integer> destinationVisitor = new Move.Visitor<Integer>() {
-                @Override
-                public Integer visit(Move.SingleMove move) {
-                    return move.destination;
-                }
-
-                @Override
-                public Integer visit(Move.DoubleMove move) {
-                    return move.destination2;
-                }
-            };
-
-            // only update the player who moved
-            if (!move.commencedBy().webColour().equals(player.piece().webColour())) return player;
-            else {
-                // update the player
-                player = player.use(move.tickets());
-                return player.at(move.accept(destinationVisitor));
-            }
-        }
-
-        private ImmutableList<LogEntry> newLog(Move move) {
-            // only update the log if MrX moved
-            if (!move.commencedBy().webColour().equals(mrX.piece().webColour())) return log;
-            else {
-                // generate log entry depending on the move type
-                Move.Visitor<Collection<LogEntry>> logEntryVisitor = new Move.Visitor<Collection<LogEntry>>() {
-                    @Override
-                    public Collection<LogEntry> visit(Move.SingleMove move) {
-                        if (setup.moves.get(log.size())) return List.of(LogEntry.reveal(move.ticket, move.destination));
-                        else return List.of(LogEntry.hidden(move.ticket));
-                    }
-
-                    @Override
-                    public Collection<LogEntry> visit(Move.DoubleMove move) {
-                        Collection<LogEntry> entries = new ArrayList<>();
-
-                        if (setup.moves.get(log.size())) entries.add(LogEntry.reveal(move.ticket1, move.destination1));
-                        else entries.add(LogEntry.hidden(move.ticket1));
-
-                        if (setup.moves.get(log.size() + 1)) entries.add(LogEntry.reveal(move.ticket2, move.destination2));
-                        else entries.add(LogEntry.hidden(move.ticket2));
-
-                        return entries;
-                    }
-                };
-
-                // generate the new log
-                Collection<LogEntry> newLog = new ArrayList<>();
-                newLog.addAll(log);
-                newLog.addAll(move.accept(logEntryVisitor));
-                return ImmutableList.copyOf(newLog);
-            }
-        }
-
-        private ImmutableList<Player> newDetectives(Move move) {
-            return ImmutableList.copyOf(
-                    detectives.stream()
-                            .map(player -> newPlayer(move, player))
-                            .collect(Collectors.toList())
-            );
         }
     }
 
