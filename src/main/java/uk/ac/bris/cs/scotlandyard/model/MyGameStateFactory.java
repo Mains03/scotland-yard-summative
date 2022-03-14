@@ -230,12 +230,11 @@ public final class MyGameStateFactory implements Factory<GameState> {
                         .collect(Collectors.toList())
             );
             log = newLog(old.log, move);
+            remaining = newRemaining(old.remaining, move);
             winner = determineWinner(move);
             if (winner.isEmpty()) {
-                remaining = newRemaining(old.remaining, move);
                 moves = generateMoves(setup.graph, remaining);
             } else {
-                remaining = ImmutableSet.of();
                 moves = ImmutableSet.of();
             }
         }
@@ -315,7 +314,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 if (mrXCaptured()) detectivesWin = true;
                 // check if detectives lose
                 if (log.size() == setup.moves.size()) return ImmutableSet.of(MrX.MRX);
-                if (!mrXCanMove()) detectivesWin = true;
+                if (!mrXCanMove() && remaining.contains(MrX.MRX)) detectivesWin = true;
                 if (detectivesWin) {
                     return ImmutableSet.copyOf(
                             detectives.stream()
