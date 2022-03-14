@@ -396,6 +396,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 // all detectives now move
                 return ImmutableSet.copyOf(
                         detectives.stream()
+                                // Only allows detectives who can actually move to remain
+                                .filter(player -> generatePossibleMoves(setup.graph, player).size() != 0)
                                 .map(player -> player.piece())
                                 .collect(Collectors.toList())
                 );
