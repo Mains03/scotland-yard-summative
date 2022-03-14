@@ -3,7 +3,6 @@ package uk.ac.bris.cs.scotlandyard.model;
 import com.google.common.collect.ImmutableList;
 
 import javax.annotation.Nonnull;
-import javax.xml.crypto.dsig.spec.TransformParameterSpec;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
