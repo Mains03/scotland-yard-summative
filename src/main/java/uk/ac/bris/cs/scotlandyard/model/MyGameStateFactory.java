@@ -89,6 +89,90 @@ public final class MyGameStateFactory implements Factory<GameState> {
             return ImmutableSet.of();
         }
 
+        // create a new MyGameState from a move
+        private MyGameState(MyGameState old, Move move) {
+            setup = old.setup; // setup doesn't change
+            mrX = movePlayer(old.mrX, move);
+            detectives = ImmutableList.copyOf(
+                    old.detectives.stream()
+                        .map(player -> movePlayer(player, move))
+                        .collect(Collectors.toList())
+            );
+            log = newLog(old.log, move);
+            winner = determineWinner(move);
+            if (winner.isEmpty()) {
+                remaining = newRemaining(old.remaining, move);
+                moves = generateMoves(setup.graph, remaining);
+            } else {
+                remaining = ImmutableSet.of();
+                moves = ImmutableSet.of();
+            }
+        }
+
+        private Player movePlayer(Player player, Move move) {
+            if (!move.commencedBy().webColour().equals(player.piece().webColour())) return player;
+            else {
+                Move.Visitor<Player> visitor = new Move.Visitor<Player>() {
+                    @Override
+                    public Player visit(Move.SingleMove move) {
+                        return player.use(move.ticket).at(move.destination);
+                    }
+
+                    @Override
+                    public Player visit(Move.DoubleMove move) {
+                        return player.use(move.ticket1).use(move.ticket2).at(move.destination2);
+                    }
+                };
+
+                return move.accept(visitor);
+            }
+        }
+
+        private ImmutableList<LogEntry> newLog(ImmutableList<LogEntry> oldLog, Move move) {
+            if (!move.commencedBy().isMrX()) return oldLog;
+            else {
+                Move.Visitor<Collection<LogEntry>> visitor = new Move.Visitor<Collection<LogEntry>>() {
+                    @Override
+                    public Collection<LogEntry> visit(Move.SingleMove move) {
+                        if (setup.moves.get(log.size())) return List.of(LogEntry.reveal(move.ticket, move.destination));
+                        else return List.of(LogEntry.hidden(move.ticket));
+                    }
+
+                    @Override
+                    public Collection<LogEntry> visit(Move.DoubleMove move) {
+                        Collection<LogEntry> entries = new ArrayList<>();
+
+                        if (setup.moves.get(log.size())) entries.add(LogEntry.reveal(move.ticket1, move.destination1));
+                        else entries.add(LogEntry.hidden(move.ticket1));
+
+                        if (setup.moves.get(log.size() + 1)) entries.add(LogEntry.reveal(move.ticket2, move.destination2));
+                        else entries.add(LogEntry.hidden(move.ticket2));
+
+                        return entries;
+                    }
+                };
+
+                // generate the new log
+                Collection<LogEntry> newLog = new ArrayList<>();
+                newLog.addAll(log);
+                newLog.addAll(move.accept(visitor));
+                return ImmutableList.copyOf(newLog);
+            }
+        }
+
+        private ImmutableSet<Piece> determineWinner(Move move) {
+            if (move.commencedBy().isMrX()) {
+                // TODO: check if any detectives can move
+            } else {
+                // TODO: check if MrX can move
+            }
+            return ImmutableSet.of();
+        }
+
+        private ImmutableSet<Piece> newRemaining(ImmutableSet<Piece> oldRemaining, Move move) {
+            return ImmutableSet.of();
+        }
+
         // helper function to create the winner set
         private ImmutableSet<Piece> detectivesWin(ImmutableList<Player> detectives) {
             return ImmutableSet.copyOf(
