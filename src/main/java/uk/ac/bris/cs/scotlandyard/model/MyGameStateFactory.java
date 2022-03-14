@@ -3,6 +3,7 @@ package uk.ac.bris.cs.scotlandyard.model;
 import com.google.common.collect.ImmutableList;
 
 import javax.annotation.Nonnull;
+import javax.xml.crypto.dsig.spec.TransformParameterSpec;
 
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
@@ -379,20 +380,58 @@ public final class MyGameStateFactory implements Factory<GameState> {
             if (move.commencedBy().isMrX()) {
                 return ImmutableSet.copyOf(
                         detectives.stream()
-                                .filter(this::detectiveCanMove)
+                                .filter(this::detectiveHasTicketToMoveWith) // detective may have to wait for others to move first
                                 .map(Player::piece)
                                 .collect(Collectors.toList())
                 );
             } else {
+                // remove player who just moved
                 Collection<Piece> newRemaining = oldRemaining.stream()
                         .filter(piece -> !move.commencedBy().webColour().equals(piece.webColour()))
                         .collect(Collectors.toList());
-                if (newRemaining.isEmpty()) {
+                // remove detectives who are blocked in by detectives who have moved
+                Collection<Piece> newRemainingCanMove = newRemaining.stream()
+                        .filter(piece -> {
+                            Collection<Player> moved = detectives.stream()
+                                    .filter(detective -> !newRemaining.contains(detective.piece()))
+                                    .collect(Collectors.toList());
+                            return detectiveNotBlockedInByMovedDetectives(getPlayer(piece), moved);
+                        })
+                        .collect(Collectors.toList());
+                if (newRemainingCanMove.isEmpty()) {
                     return ImmutableSet.of(MrX.MRX);
                 } else {
-                    return ImmutableSet.copyOf(newRemaining);
+                    return ImmutableSet.copyOf(newRemainingCanMove);
                 }
             }
+        }
+
+        // check if a detective has any ticket at their location to move with
+        private boolean detectiveHasTicketToMoveWith(Player player) {
+            for (int destination : setup.graph.adjacentNodes(player.location())) {
+                if (detectiveHasTicketToMoveTo(player, destination)) return true;
+            }
+            return false;
+        }
+
+        private boolean detectiveNotBlockedInByMovedDetectives(Player player, Collection<Player> moved) {
+            for (int destination : setup.graph.adjacentNodes(player.location())) {
+                if (moved.stream()
+                        .noneMatch(movedPlayer -> movedPlayer.location() == destination)) {
+                    if (detectiveHasTicketToMoveTo(player, destination)) return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean detectiveHasTicketToMoveTo(Player player, int destination) {
+            Optional<ImmutableSet<ScotlandYard.Transport>> allTransport = setup.graph.edgeValue(player.location(), destination);
+            if (allTransport.isPresent()) {
+                for (ScotlandYard.Transport transport : allTransport.get()) {
+                    if (player.has(transport.requiredTicket())) return true;
+                }
+            }
+            return false;
         }
 
         @Nonnull
