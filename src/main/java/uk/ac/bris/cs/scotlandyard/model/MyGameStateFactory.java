@@ -24,7 +24,7 @@ import java.util.stream.Collectors;
  */
 public final class MyGameStateFactory implements Factory<GameState> {
 
-    private final class MyGameState implements GameState {
+    private final class MyGameState implements GameState, Board {
 
 		private final GameSetup setup;
 		private final ImmutableSet<Piece> remaining;
@@ -57,12 +57,11 @@ public final class MyGameStateFactory implements Factory<GameState> {
             this.mrX = mrX;
             this.detectives = detectives;
             this.log = log;
+            this.remaining = remaining;
             winner = determineWinner();
             if (winner.isEmpty()) {
-                this.remaining = remaining;
                 moves = generateMoves(setup.graph, remaining);
             } else {
-                this.remaining = ImmutableSet.of();
                 moves = ImmutableSet.of();
             }
         }
