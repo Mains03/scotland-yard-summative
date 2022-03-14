@@ -241,21 +241,38 @@ public final class MyGameStateFactory implements Factory<GameState> {
         }
 
         private Player movePlayer(Player player, Move move) {
-            if (!move.commencedBy().webColour().equals(player.piece().webColour())) return player;
-            else {
-                Move.Visitor<Player> visitor = new Move.Visitor<Player>() {
-                    @Override
-                    public Player visit(Move.SingleMove move) {
-                        return player.use(move.ticket).at(move.destination);
-                    }
+            Move.Visitor<Player> useTicketsVisitor = new Move.Visitor<Player>() {
+                @Override
+                public Player visit(Move.SingleMove move) {
+                    return player.use(move.ticket).at(move.destination);
+                }
 
-                    @Override
-                    public Player visit(Move.DoubleMove move) {
-                        return player.use(move.ticket1).use(move.ticket2).at(move.destination2);
-                    }
-                };
+                @Override
+                public Player visit(Move.DoubleMove move) {
+                    return player.use(move.ticket1).use(move.ticket2).at(move.destination2);
+                }
+            };
 
-                return move.accept(visitor);
+            Move.Visitor<Player> giveTicketsVisitor = new Move.Visitor<Player>() {
+                @Override
+                public Player visit(Move.SingleMove move) {
+                    return player.give(move.ticket);
+                }
+
+                @Override
+                public Player visit(Move.DoubleMove move) {
+                    return player.give(move.ticket1).give(move.ticket2);
+                }
+            };
+
+            if (player.isMrX()) {
+                if (move.commencedBy().isMrX()) return move.accept(useTicketsVisitor);
+                else return move.accept(giveTicketsVisitor);
+            } else {
+                if (!move.commencedBy().webColour().equals(player.piece().webColour())) return player;
+                else {
+                    return move.accept(useTicketsVisitor);
+                }
             }
         }
 
