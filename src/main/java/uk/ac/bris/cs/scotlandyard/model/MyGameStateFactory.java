@@ -309,14 +309,12 @@ public final class MyGameStateFactory implements Factory<GameState> {
         }
 
         private ImmutableSet<Piece> determineWinner(Move move) {
-            if (move.commencedBy().isMrX()) {
-                // check if MrX wins
-                if (log.size() == 24) return ImmutableSet.of(MrX.MRX);
-                if (!detectivesCanMove()) return ImmutableSet.of(MrX.MRX);
-            } else {
+            if (!move.commencedBy().isMrX()) {
                 // check if detectives win
                 boolean detectivesWin = false;
                 if (mrXCaptured()) detectivesWin = true;
+                // check if detectives lose
+                if (log.size() == setup.moves.size()) return ImmutableSet.of(MrX.MRX);
                 if (!mrXCanMove()) detectivesWin = true;
                 if (detectivesWin) {
                     return ImmutableSet.copyOf(
