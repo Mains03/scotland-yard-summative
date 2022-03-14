@@ -408,7 +408,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                         .collect(Collectors.toList());
                 // inspect the new remaining
                 if (currentRemaining.isEmpty()) {
-                    // all detectives have moved, MrX's turn
+                    // all detectives have moved (or can't move), MrX's turn
                     return ImmutableSet.of(MrX.MRX);
                 }
                 else {
