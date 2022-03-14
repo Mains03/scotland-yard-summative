@@ -54,126 +54,12 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 throw new IllegalArgumentException();
             }
             this.setup = setup;
-            this.remaining = remaining;
-            this.log = log;
             this.mrX = mrX;
             this.detectives = detectives;
-            winner = determineWinner(setup.graph, mrX, detectives);
-            if (winner.size() == 0) moves = generateMoves(setup.graph, remaining);
-            else moves = ImmutableSet.of();
-        }
-
-        private ImmutableSet<Piece> determineWinner(
-                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-                Player mrX,
-                ImmutableList<Player> detectives
-        ) {
-            // check if MrX is captured
-            for (Player detective : detectives) {
-                if (detective.location() == mrX.location()) {
-                    return detectivesWin(detectives);
-                }
-            }
-            // check if MrX has escaped
-            if (log.size() == 24) return ImmutableSet.of(mrX.piece());
-            // check if detectives can move
-            if (remaining.size() == detectives.size()) {
-                if (detectivesOutOfMoves(graph, detectives)) return ImmutableSet.of(MrX.MRX);
-            }
-            if (remaining.contains(MrX.MRX)) {
-                // check if MrX can move
-                if (mrXTrapped(graph, mrX, detectives)) return detectivesWin(detectives);
-                if (mrXStuck(graph, mrX, detectives)) return detectivesWin(detectives);
-            }
-            // no winner
-            return ImmutableSet.of();
-        }
-
-        // helper function to create the winner set
-        private ImmutableSet<Piece> detectivesWin(ImmutableList<Player> detectives) {
-            return ImmutableSet.copyOf(
-                    detectives.stream()
-                            .map(Player::piece)
-                            .collect(Collectors.toList())
-            );
-        }
-
-        private boolean mrXTrapped(
-                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-                Player mrX,
-                ImmutableList<Player> detectives
-        ) {
-            // check if detectives occupy all adjacent nodes
-            Set<Integer> adjacentNodes = graph.adjacentNodes(mrX.location());
-            if (adjacentNodes.stream()
-                    .filter(location -> detectives.stream()
-                            .noneMatch(detective -> detective.location() == location))
-                    .count() == 0)
-                return true;
-            return false;
-        }
-
-        private boolean detectivesOutOfMoves(
-                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-                ImmutableList<Player> detectives
-        ) {
-            return detectives.stream()
-                    .noneMatch(detective -> detectiveCanMove(graph, detective));
-        }
-
-        private boolean detectiveCanMove(
-                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-                Player detective
-        ) {
-            // check if the detective can move to any adjacent node
-            for (int adjacentNode : graph.adjacentNodes(detective.location())) {
-                if (detectiveCanTravelTo(graph, detective, adjacentNode)) return true;
-            }
-
-            return false;
-        }
-
-        private boolean detectiveCanTravelTo(
-                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-                Player detective,
-                int destination
-        ) {
-            // check if the detective has any required ticket
-            ImmutableSet<ScotlandYard.Transport> allTransport = graph.edgeValue(detective.location(), destination).get();
-            for (ScotlandYard.Transport transport : allTransport) {
-                if (detective.has(transport.requiredTicket())) return true;
-            }
-            return false;
-        }
-
-        private boolean mrXStuck(
-                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-                Player mrX,
-                ImmutableList<Player> detectives
-        ) {
-            // check if MrX can move to any adjacent node
-            for (int adjacentNode : graph.adjacentNodes(mrX.location())) {
-                if (mrXCanTravelTo(graph, mrX, detectives, adjacentNode)) return false;
-            }
-            return true;
-        }
-
-        private boolean mrXCanTravelTo(
-                ImmutableValueGraph<Integer, ImmutableSet<ScotlandYard.Transport>> graph,
-                Player mrX,
-                ImmutableList<Player> detectives,
-                int destination
-        ) {
-            // ensure there's no detective at the destination
-            if (detectives.stream()
-                    .anyMatch(detective -> detective.location() == destination)) return false;
-            if (mrX.has(ScotlandYard.Ticket.SECRET)) return true;
-            // check if MrX has any required ticket
-            ImmutableSet<ScotlandYard.Transport> allTransport = graph.edgeValue(mrX.location(), destination).get();
-            for (ScotlandYard.Transport transport : allTransport) {
-                if (mrX.has(transport.requiredTicket())) return true;
-            }
-            return false;
+            this.remaining = remaining;
+            this.log = log;
+            winner = ImmutableSet.of(); // can't be a winner on the first turn
+            moves = generateMoves(setup.graph, remaining);
         }
 
         // Gets the reference of a player from the provided piece
@@ -382,11 +268,67 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
         private ImmutableSet<Piece> determineWinner(Move move) {
             if (move.commencedBy().isMrX()) {
-                // TODO: check if any detectives can move
+                // check if MrX wins
+                boolean mrXWins = false;
+                if (log.size() == 24) mrXWins = true;
+                if (!detectivesCanMove()) mrXWins = true;
+                if (mrXWins) return ImmutableSet.of(MrX.MRX);
             } else {
-                // TODO: check if MrX can move
+                // check if detectives win
+                boolean detectivesWin = false;
+                if (mrXCaptured()) detectivesWin = true;
+                if (!mrXCanMove()) detectivesWin = true;
+                if (detectivesWin) {
+                    return ImmutableSet.copyOf(
+                            detectives.stream()
+                                    .map(Player::piece)
+                                    .collect(Collectors.toList())
+                    );
+                }
             }
             return ImmutableSet.of();
+        }
+
+        private boolean detectivesCanMove() {
+            for (Player detective : detectives) {
+                for (int adjacent : setup.graph.adjacentNodes(detective.location())) {
+                    ImmutableSet<ScotlandYard.Transport> allTransport = setup.graph.edgeValue(detective.location(), adjacent).get();
+                    for (ScotlandYard.Transport transport : allTransport) {
+                        if (detective.has(transport.requiredTicket())) {
+                            if (detectives.stream()
+                                    .noneMatch(otherDetective -> otherDetective.location() == adjacent)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+            }
+            return false;
+        }
+
+        private boolean mrXCaptured() {
+            for (Player detective : detectives) {
+                if (detective.location() == mrX.location()) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        private boolean mrXCanMove() {
+            for (int adjacent : setup.graph.adjacentNodes(mrX.location())) {
+                ImmutableSet<ScotlandYard.Transport> allTransport = setup.graph.edgeValue(mrX.location(), adjacent).get();
+                for (ScotlandYard.Transport transport : allTransport) {
+                    if (mrX.has(ScotlandYard.Ticket.SECRET) ||
+                            mrX.has(transport.requiredTicket())) {
+                        if (detectives.stream()
+                                .noneMatch(detective -> detective.location() == adjacent)) {
+                            return true;
+                        }
+                    }
+                }
+            }
+            return false;
         }
 
         private ImmutableSet<Piece> newRemaining(ImmutableSet<Piece> oldRemaining, Move move) {
