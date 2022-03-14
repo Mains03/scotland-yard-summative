@@ -56,10 +56,35 @@ public final class MyGameStateFactory implements Factory<GameState> {
             this.setup = setup;
             this.mrX = mrX;
             this.detectives = detectives;
-            this.remaining = remaining;
             this.log = log;
-            winner = ImmutableSet.of(); // can't be a winner on the first turn
-            moves = generateMoves(setup.graph, remaining);
+            winner = determineWinner();
+            if (winner.isEmpty()) {
+                this.remaining = remaining;
+                moves = generateMoves(setup.graph, remaining);
+            } else {
+                this.remaining = ImmutableSet.of();
+                moves = ImmutableSet.of();
+            }
+        }
+
+        // check if there's a winner on the first turn
+        private ImmutableSet<Piece> determineWinner() {
+            boolean detectivesWin = false;
+            boolean mrXWins = false;
+            for (Player detective : detectives) {
+                if (detective.location() == mrX.location()) detectivesWin = true;
+            }
+            if (!mrXCanMove()) detectivesWin = true;
+            if (!detectivesCanMove()) mrXWins = true;
+            if (detectivesWin) {
+                return ImmutableSet.copyOf(
+                        detectives.stream()
+                                .map(Player::piece)
+                                .collect(Collectors.toList())
+                );
+            }
+            if (mrXWins) return ImmutableSet.of(MrX.MRX);
+            return ImmutableSet.of();
         }
 
         // Gets the reference of a player from the provided piece
@@ -240,7 +265,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                 Move.Visitor<Collection<LogEntry>> visitor = new Move.Visitor<Collection<LogEntry>>() {
                     @Override
                     public Collection<LogEntry> visit(Move.SingleMove move) {
-                        if (setup.moves.get(log.size())) return List.of(LogEntry.reveal(move.ticket, move.destination));
+                        if (setup.moves.get(oldLog.size())) return List.of(LogEntry.reveal(move.ticket, move.destination));
                         else return List.of(LogEntry.hidden(move.ticket));
                     }
 
@@ -248,10 +273,10 @@ public final class MyGameStateFactory implements Factory<GameState> {
                     public Collection<LogEntry> visit(Move.DoubleMove move) {
                         Collection<LogEntry> entries = new ArrayList<>();
 
-                        if (setup.moves.get(log.size())) entries.add(LogEntry.reveal(move.ticket1, move.destination1));
+                        if (setup.moves.get(oldLog.size())) entries.add(LogEntry.reveal(move.ticket1, move.destination1));
                         else entries.add(LogEntry.hidden(move.ticket1));
 
-                        if (setup.moves.get(log.size() + 1)) entries.add(LogEntry.reveal(move.ticket2, move.destination2));
+                        if (setup.moves.get(oldLog.size() + 1)) entries.add(LogEntry.reveal(move.ticket2, move.destination2));
                         else entries.add(LogEntry.hidden(move.ticket2));
 
                         return entries;
@@ -260,7 +285,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
                 // generate the new log
                 Collection<LogEntry> newLog = new ArrayList<>();
-                newLog.addAll(log);
+                newLog.addAll(oldLog);
                 newLog.addAll(move.accept(visitor));
                 return ImmutableList.copyOf(newLog);
             }
@@ -269,10 +294,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
         private ImmutableSet<Piece> determineWinner(Move move) {
             if (move.commencedBy().isMrX()) {
                 // check if MrX wins
-                boolean mrXWins = false;
-                if (log.size() == 24) mrXWins = true;
-                if (!detectivesCanMove()) mrXWins = true;
-                if (mrXWins) return ImmutableSet.of(MrX.MRX);
+                if (log.size() == 24) return ImmutableSet.of(MrX.MRX);
+                if (!detectivesCanMove()) return ImmutableSet.of(MrX.MRX);
             } else {
                 // check if detectives win
                 boolean detectivesWin = false;
@@ -285,6 +308,8 @@ public final class MyGameStateFactory implements Factory<GameState> {
                                     .collect(Collectors.toList())
                     );
                 }
+                // check if detectives lose
+                if (!detectivesCanMove()) return ImmutableSet.of(MrX.MRX);
             }
             return ImmutableSet.of();
         }
@@ -345,7 +370,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
                                 .collect(Collectors.toList())
                 );
             } else {
-                Collection<Piece> newRemaining = remaining.stream()
+                Collection<Piece> newRemaining = oldRemaining.stream()
                         .filter(piece -> !move.commencedBy().webColour().equals(piece.webColour()))
                         .collect(Collectors.toList());
                 if (newRemaining.isEmpty()) {
@@ -427,6 +452,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
         @Override
         public GameState advance(Move move) {
             if (!moves.contains(move)) throw new IllegalArgumentException("Illegal move: " + move);
+            if (!winner.isEmpty()) throw new IllegalArgumentException();
 
             return new MyGameState(this, move);
         }
