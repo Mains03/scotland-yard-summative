@@ -249,7 +249,7 @@ public final class MyGameStateFactory implements Factory<GameState> {
 
                 @Override
                 public Player visit(Move.DoubleMove move) {
-                    return player.use(move.ticket1).use(move.ticket2).at(move.destination2);
+                    return player.use(ScotlandYard.Ticket.DOUBLE).use(move.ticket1).use(move.ticket2).at(move.destination2);
                 }
             };
 
