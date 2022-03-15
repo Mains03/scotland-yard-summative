@@ -54,13 +54,14 @@ public final class MyModelFactory implements Factory<Model> {
 		@Override
 		public void chooseMove(@Nonnull Move move) {
 			board = board.advance(move);
-			for (Observer observer : observers) {
-				observer.onModelChanged(board, Observer.Event.MOVE_MADE);
-			}
+			Observer.Event event;
 			if (board.getWinner().size() != 0) {
-				for (Observer observer : observers) {
-					observer.onModelChanged(board, Observer.Event.GAME_OVER);
-				}
+				event = Observer.Event.GAME_OVER;
+			} else {
+				event = Observer.Event.MOVE_MADE;
+			}
+			for (Observer observer : observers) {
+				observer.onModelChanged(board, event);
 			}
 		}
 	}
